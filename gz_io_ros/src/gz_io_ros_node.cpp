@@ -1,9 +1,7 @@
 #include <functional>
 #include <rclcpp/rclcpp.hpp>
-#include "message_filters/subscriber.h"
-#include "gz_io_ros/gz_io_ros.hpp"
 
-using namespace message_filters;
+#include "gz_io_ros/gz_io_ros.hpp"
 
 double gir::GzIoRos::convert_trans_rot_vel_to_steering_angle(double vel, double omega, double wheelbase) {
     if (omega == 0 || vel == 0) {
@@ -17,8 +15,7 @@ double gir::GzIoRos::convert_trans_rot_vel_to_steering_angle(double vel, double 
     return std::atan(wheelbase / rad);
 }
 
-gir::GzIoRos::GzIoRos(rclcpp::NodeOptions options)
-        : Node("gz_io_ros", options) {
+gir::GzIoRos::GzIoRos(rclcpp::NodeOptions options) : Node("gz_io_ros", options) {
     rclcpp::QoS qos(50);
     _max_throttle_speed = this->declare_parameter("max_throttle_speed", 10.0);
     _max_braking_speed = this->declare_parameter("max_brake_speed", 10.0);
@@ -26,13 +23,11 @@ gir::GzIoRos::GzIoRos(rclcpp::NodeOptions options)
 
     _odom_acks_pub = this->create_publisher<ackermann_msgs::msg::AckermannDrive>("/odom_ack", 10);
 
-    _twist_sub = this->create_subscription<geometry_msgs::msg::Twist>("/robot/cmd_vel", rclcpp::QoS(10).reliable(),
-                                                                      std::bind(&GzIoRos::twist_cb, this,
-                                                                                std::placeholders::_1));
+    _twist_sub = this->create_subscription<geometry_msgs::msg::Twist>(
+        "/robot/cmd_vel", rclcpp::QoS(10).reliable(), std::bind(&GzIoRos::twist_cb, this, std::placeholders::_1));
 
-    _odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("/odom", rclcpp::QoS(10).reliable(),
-                                                                   std::bind(&GzIoRos::odom_cb, this,
-                                                                             std::placeholders::_1));
+    _odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
+        "/odom", rclcpp::QoS(10).reliable(), std::bind(&GzIoRos::odom_cb, this, std::placeholders::_1));
 }
 
 void gir::GzIoRos::convert_data(nav_msgs::msg::Odometry::ConstSharedPtr odom,
@@ -84,5 +79,3 @@ void gir::GzIoRos::twist_cb(geometry_msgs::msg::Twist::SharedPtr twist) {
         twist_queue.pop_front();
     }
 }
-
-

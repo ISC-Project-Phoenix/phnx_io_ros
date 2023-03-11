@@ -1,8 +1,9 @@
-#include <memory>
-#include <rclcpp/rclcpp.hpp>
 #include "gz_io_ros/gz_io_ros.hpp"
 
-int main(int argc, char **argv) {
+#include <memory>
+#include <rclcpp/rclcpp.hpp>
+
+int main(int argc, char** argv) {
     rclcpp::init(argc, argv);
     rclcpp::executors::SingleThreadedExecutor exec;
     rclcpp::NodeOptions options;
