@@ -1,19 +1,8 @@
 #include <functional>
 #include <rclcpp/rclcpp.hpp>
+#include <libackermann/libackermann.hpp>
 
 #include "gz_io_ros/gz_io_ros.hpp"
-
-double gir::GzIoRos::convert_trans_rot_vel_to_steering_angle(double vel, double omega, double wheelbase) {
-    if (omega == 0 || vel == 0) {
-        return 0;
-    }
-
-    // Remove negative so steering doesn't reverse when reversing.
-    vel = std::abs(vel);
-
-    auto rad = vel / omega;
-    return std::atan(wheelbase / rad);
-}
 
 gir::GzIoRos::GzIoRos(rclcpp::NodeOptions options) : Node("gz_io_ros", options) {
     rclcpp::QoS qos(50);
@@ -34,9 +23,11 @@ gir::GzIoRos::GzIoRos(rclcpp::NodeOptions options) : Node("gz_io_ros", options) 
 void gir::GzIoRos::convert_data(nav_msgs::msg::Odometry::ConstSharedPtr odom,
                                 geometry_msgs::msg::Twist::ConstSharedPtr twist) {
     //Convert odom + twist msg to ackermann drive msg
-    ackermann_msgs::msg::AckermannDrive msg;
-    msg.steering_angle = this->convert_trans_rot_vel_to_steering_angle(odom->twist.twist.linear.x,
-                                                                       odom->twist.twist.angular.z, this->_wheelbase);
+    ackermann_msgs::msg::AckermannDrive msg{};
+
+    TwistCommand t{static_cast<float>(twist->angular.z), static_cast<float>(twist->linear.x)};
+    AckermannCommand a{ack::twist_to_ackermann(t, this->_wheelbase)};
+    msg.steering_angle = a.ackermann_angle;
     msg.acceleration = twist->linear.x;
     msg.speed = odom->twist.twist.linear.x;
     validate_msg(msg);

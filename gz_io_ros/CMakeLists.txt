@@ -47,6 +47,16 @@ target_compile_features(gz_io_ros PUBLIC c_std_99 cxx_std_17)  # Require C99 and
 install(TARGETS gz_io_ros
         DESTINATION lib/${PROJECT_NAME})
 
+
+include(FetchContent)
+FetchContent_Declare(
+        libackermann
+        GIT_REPOSITORY https://github.com/iscumd/libackermann.git
+)
+FetchContent_MakeAvailable(libackermann)
+
+target_link_libraries(${PROJECT_NAME} libackermann)
+
 if (BUILD_TESTING)
     # Manually invoke clang format so it actually uses our file
     find_package(ament_cmake_clang_format REQUIRED)

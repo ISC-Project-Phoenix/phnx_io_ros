@@ -37,8 +37,6 @@ public:
     ///@param twist New message from topic
     void twist_cb(geometry_msgs::msg::Twist::SharedPtr twist);
 
-    double convert_trans_rot_vel_to_steering_angle(double vel, double omega, double wheelbase);
-
     ///@breif Validate that converted data is within parameters and bound message if not
     ///@param msg AckermannDrive message to check
     void validate_msg(ackermann_msgs::msg::AckermannDrive &msg);
@@ -52,10 +50,10 @@ private:
     std::list<geometry_msgs::msg::Twist::SharedPtr> twist_queue;
     std::list<nav_msgs::msg::Odometry::SharedPtr> odom_queue;
 
-    double _max_throttle_speed{};
-    double _max_braking_speed{};
-    double _wheelbase{};
-    double _max_steering_rad{};
+    float _max_throttle_speed{};
+    float _max_braking_speed{};
+    float _wheelbase{};
+    float _max_steering_rad{};
 };
 
 }  // namespace gir
