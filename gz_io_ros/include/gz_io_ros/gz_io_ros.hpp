@@ -24,6 +24,24 @@ class GzIoRos : public rclcpp::Node {
 public:
     explicit GzIoRos(rclcpp::NodeOptions options);
 
+    ///@brief Convert odom/twist data to one Ackeramann message in defined format
+    ///@param odom Odom message to convert
+    ///@param twist Twist message to convert
+    void convert_data(nav_msgs::msg::Odometry::ConstSharedPtr odom, geometry_msgs::msg::Twist::ConstSharedPtr twist);
+
+    ///@breif Callback for new odom messages
+    ///@param odom New message from topic
+    void odom_cb(nav_msgs::msg::Odometry::SharedPtr odom);
+
+    ///@breif Callback for new twist messages
+    ///@param twist New message from topic
+    void twist_cb(geometry_msgs::msg::Twist::SharedPtr twist);
+
+    double convert_trans_rot_vel_to_steering_angle(double vel, double omega, double wheelbase);
+
+    ///@breif Validate that converted data is within parameters and bound message if not
+    ///@param msg AckermannDrive message to check
+    void validate_msg(ackermann_msgs::msg::AckermannDrive &msg);
 private:
     std::optional<std::shared_ptr<rclcpp::Publisher<ackermann_msgs::msg::AckermannDrive>>> _odom_acks_pub =
         std::nullopt;
@@ -37,14 +55,7 @@ private:
     double _max_throttle_speed{};
     double _max_braking_speed{};
     double _wheelbase{};
-
-    void convert_data(nav_msgs::msg::Odometry::ConstSharedPtr odom, geometry_msgs::msg::Twist::ConstSharedPtr twist);
-
-    void odom_cb(nav_msgs::msg::Odometry::SharedPtr odom);
-
-    void twist_cb(geometry_msgs::msg::Twist::SharedPtr twist);
-
-    double convert_trans_rot_vel_to_steering_angle(double vel, double omega, double wheelbase);
+    double _max_steering_rad{};
 };
 
 }  // namespace gir
