@@ -24,15 +24,22 @@ void gir::GzIoRos::convert_data(nav_msgs::msg::Odometry::ConstSharedPtr odom,
                                 geometry_msgs::msg::Twist::ConstSharedPtr twist) {
     //Convert odom + twist msg to ackermann drive msg
 
-    TwistCommand t{static_cast<float>(twist->angular.z), static_cast<float>(twist->linear.x)};
-    AckermannCommand a{ack::twist_to_ackermann(t, this->_wheelbase)};
+    TwistCommand t{static_cast<float>(twist->linear.x), static_cast<float>(twist->angular.z)};
+    AckermannCommand a = ack::twist_to_ackermann(t, this->_wheelbase);
 
-    converted_msg.steering_angle = a.ackermann_angle;
+    auto ratio = ack::get_inverse_steering_ratio(ack::Project::Phoenix);
+
+    // ack odom messages carry steering wheel in steering field, rather than ackermann wheel angle
+    converted_msg.steering_angle = ratio(a.ackermann_angle);
+
+    // Throttle percent (encoded as a speed as per a twist message) is in the accell field
     converted_msg.acceleration = twist->linear.x;
+
+    // Encoder values (odom in sims case) is in the speed field
     converted_msg.speed = odom->twist.twist.linear.x;
     converted_msg.jerk = 0.0;
     validate_msg(converted_msg);
-    this->_odom_acks_pub->get()->publish(converted_msg);
+    this->_odom_acks_pub->publish(converted_msg);
 }
 
 void gir::GzIoRos::odom_cb(nav_msgs::msg::Odometry::SharedPtr odom) {
@@ -71,7 +78,7 @@ void gir::GzIoRos::validate_msg(ackermann_msgs::msg::AckermannDrive& msg) {
     if (msg.acceleration < _max_braking_speed) {
         RCLCPP_WARN(this->get_logger(), "Were attempting to go beyond max braking speed! Speed value received: %f",
                     msg.acceleration);
-        msg.acceleration = _max_braking_speed;
+        msg.acceleration = _max_braking_speed; //TODO IMO we shouldn't overwrite the values here, since this is supposed to be odom, the state of the vehicle. Data logger will already drop invalid commands, so this will force us to record bad data, since sim will still execute the bad command
     } else if (msg.acceleration > _max_throttle_speed) {
         RCLCPP_WARN(this->get_logger(), "Were attempting to go beyond max throttle speed! Speed value received: %f",
                     msg.acceleration);

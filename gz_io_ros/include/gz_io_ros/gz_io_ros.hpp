@@ -5,7 +5,6 @@
 #include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "nav_msgs/msg/odometry.hpp"
-#include "optional"
 
 namespace gir {
 
@@ -41,8 +40,7 @@ public:
     ///@param msg AckermannDrive message to check
     void validate_msg(ackermann_msgs::msg::AckermannDrive &msg);
 private:
-    std::optional<std::shared_ptr<rclcpp::Publisher<ackermann_msgs::msg::AckermannDrive>>> _odom_acks_pub =
-        std::nullopt;
+    rclcpp::Publisher<ackermann_msgs::msg::AckermannDrive>::SharedPtr _odom_acks_pub;
 
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr _twist_sub;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr _odom_sub;
@@ -51,7 +49,6 @@ private:
     std::list<nav_msgs::msg::Odometry::SharedPtr> odom_queue;
 
     ackermann_msgs::msg::AckermannDrive converted_msg{};
-
 
     unsigned long max_buf_size{15};
     float _max_throttle_speed{};
