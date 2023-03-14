@@ -1,8 +1,8 @@
 #include <functional>
 #include <rclcpp/rclcpp.hpp>
-#include <libackermann/libackermann.hpp>
 
 #include "gz_io_ros/gz_io_ros.hpp"
+#include "libackermann/libackermann.hpp"
 
 gir::GzIoRos::GzIoRos(rclcpp::NodeOptions options) : Node("gz_io_ros", options) {
     rclcpp::QoS qos(50);
@@ -23,21 +23,22 @@ gir::GzIoRos::GzIoRos(rclcpp::NodeOptions options) : Node("gz_io_ros", options) 
 void gir::GzIoRos::convert_data(nav_msgs::msg::Odometry::ConstSharedPtr odom,
                                 geometry_msgs::msg::Twist::ConstSharedPtr twist) {
     //Convert odom + twist msg to ackermann drive msg
-    ackermann_msgs::msg::AckermannDrive msg{};
 
     TwistCommand t{static_cast<float>(twist->angular.z), static_cast<float>(twist->linear.x)};
     AckermannCommand a{ack::twist_to_ackermann(t, this->_wheelbase)};
-    msg.steering_angle = a.ackermann_angle;
-    msg.acceleration = twist->linear.x;
-    msg.speed = odom->twist.twist.linear.x;
-    validate_msg(msg);
-    this->_odom_acks_pub->get()->publish(msg);
+
+    converted_msg.steering_angle = a.ackermann_angle;
+    converted_msg.acceleration = twist->linear.x;
+    converted_msg.speed = odom->twist.twist.linear.x;
+    converted_msg.jerk = 0.0;
+    validate_msg(converted_msg);
+    this->_odom_acks_pub->get()->publish(converted_msg);
 }
 
 void gir::GzIoRos::odom_cb(nav_msgs::msg::Odometry::SharedPtr odom) {
     //Since twist messages aren't constant there will be situations where we have odom and no twist,
     // in that case send zero twist to make sure those values are zeroed out
-    if (odom_queue.size() > 15) {
+    if (odom_queue.size() > max_buf_size) {
         odom_queue.clear();
     }
     this->odom_queue.push_back(odom);
@@ -55,7 +56,7 @@ void gir::GzIoRos::odom_cb(nav_msgs::msg::Odometry::SharedPtr odom) {
 
 void gir::GzIoRos::twist_cb(geometry_msgs::msg::Twist::SharedPtr twist) {
     //Since odom messages are constant as long as sim is running its fine to ensure both queues have data
-    if (twist_queue.size() > 15) {
+    if (twist_queue.size() > max_buf_size) {
         twist_queue.clear();
     }
     this->twist_queue.push_back(twist);
@@ -66,17 +67,18 @@ void gir::GzIoRos::twist_cb(geometry_msgs::msg::Twist::SharedPtr twist) {
         twist_queue.pop_front();
     }
 }
-void gir::GzIoRos::validate_msg(ackermann_msgs::msg::AckermannDrive &msg) {
-    if(msg.acceleration < _max_braking_speed){
-        RCLCPP_WARN(this->get_logger(), "Were attempting to go beyond max braking speed! Speed value received: %f", msg.acceleration);
+void gir::GzIoRos::validate_msg(ackermann_msgs::msg::AckermannDrive& msg) {
+    if (msg.acceleration < _max_braking_speed) {
+        RCLCPP_WARN(this->get_logger(), "Were attempting to go beyond max braking speed! Speed value received: %f",
+                    msg.acceleration);
         msg.acceleration = _max_braking_speed;
-    }
-    else if(msg.acceleration > _max_throttle_speed){
-        RCLCPP_WARN(this->get_logger(), "Were attempting to go beyond max throttle speed! Speed value received: %f", msg.acceleration);
+    } else if (msg.acceleration > _max_throttle_speed) {
+        RCLCPP_WARN(this->get_logger(), "Were attempting to go beyond max throttle speed! Speed value received: %f",
+                    msg.acceleration);
         msg.acceleration = _max_throttle_speed;
-    }
-    else if(msg.steering_angle > _max_steering_rad || msg.steering_angle < (-1*_max_steering_rad)){
-        RCLCPP_WARN(this->get_logger(), "Were attempting to go beyond max steering angle! Value received: %f", msg.steering_angle);
+    } else if (msg.steering_angle > _max_steering_rad || msg.steering_angle < (-1 * _max_steering_rad)) {
+        RCLCPP_WARN(this->get_logger(), "Were attempting to go beyond max steering angle! Value received: %f",
+                    msg.steering_angle);
         msg.steering_angle = _max_steering_rad;
     }
 }

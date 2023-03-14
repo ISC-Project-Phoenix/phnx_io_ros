@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.8)
 project(gz_io_ros)
+include(FetchContent)
 
 # Default to C99
 if (NOT CMAKE_C_STANDARD)
@@ -28,6 +29,14 @@ find_package(nav_msgs REQUIRED)
 
 add_executable(gz_io_ros src/gz_io_ros.cpp src/gz_io_ros_node.cpp)
 
+FetchContent_Declare(
+        libackermann
+        GIT_REPOSITORY https://github.com/iscumd/libackermann.git
+)
+FetchContent_MakeAvailable(libackermann)
+
+target_link_libraries(gz_io_ros libackermann)
+
 set(dependencies
         rclcpp
         std_msgs
@@ -46,16 +55,6 @@ target_compile_features(gz_io_ros PUBLIC c_std_99 cxx_std_17)  # Require C99 and
 
 install(TARGETS gz_io_ros
         DESTINATION lib/${PROJECT_NAME})
-
-
-include(FetchContent)
-FetchContent_Declare(
-        libackermann
-        GIT_REPOSITORY https://github.com/iscumd/libackermann.git
-)
-FetchContent_MakeAvailable(libackermann)
-
-target_link_libraries(${PROJECT_NAME} libackermann)
 
 if (BUILD_TESTING)
     # Manually invoke clang format so it actually uses our file

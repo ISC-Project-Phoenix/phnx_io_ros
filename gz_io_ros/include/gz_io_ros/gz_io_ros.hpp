@@ -50,6 +50,10 @@ private:
     std::list<geometry_msgs::msg::Twist::SharedPtr> twist_queue;
     std::list<nav_msgs::msg::Odometry::SharedPtr> odom_queue;
 
+    ackermann_msgs::msg::AckermannDrive converted_msg{};
+
+
+    unsigned long max_buf_size{15};
     float _max_throttle_speed{};
     float _max_braking_speed{};
     float _wheelbase{};
