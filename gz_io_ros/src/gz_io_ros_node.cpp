@@ -6,9 +6,6 @@
 
 gir::GzIoRos::GzIoRos(rclcpp::NodeOptions options) : Node("gz_io_ros", options) {
     rclcpp::QoS qos(50);
-    _max_throttle_speed = this->declare_parameter("max_throttle_speed", 10.0);
-    _max_braking_speed = this->declare_parameter("max_brake_speed", -10.0);
-    _max_steering_rad = this->declare_parameter("max_steering_rad", 2.0);
     _wheelbase = this->declare_parameter("wheelbase", 1.0);
 
     _odom_acks_pub = this->create_publisher<ackermann_msgs::msg::AckermannDrive>("/odom_ack", 10);
@@ -20,27 +17,28 @@ gir::GzIoRos::GzIoRos(rclcpp::NodeOptions options) : Node("gz_io_ros", options) 
         "/odom", rclcpp::QoS(10).reliable(), std::bind(&GzIoRos::odom_cb, this, std::placeholders::_1));
 }
 
-void gir::GzIoRos::convert_data(nav_msgs::msg::Odometry::ConstSharedPtr odom,
-                                geometry_msgs::msg::Twist::ConstSharedPtr twist) {
+ackermann_msgs::msg::AckermannDrive gir::GzIoRos::convert_data(nav_msgs::msg::Odometry::ConstSharedPtr odom,
+                                                               geometry_msgs::msg::Twist::ConstSharedPtr twist) const {
     //Convert odom + twist msg to ackermann drive msg
-
+    ackermann_msgs::msg::AckermannDrive msg{};
     TwistCommand t{static_cast<float>(twist->linear.x), static_cast<float>(twist->angular.z)};
-    AckermannCommand a = ack::twist_to_ackermann(t, this->_wheelbase);
+    AckermannCommand a = ack::twist_to_ackermann(t, static_cast<float>(this->_wheelbase));
 
     auto ratio = ack::get_inverse_steering_ratio(ack::Project::Phoenix);
 
     // ack odom messages carry steering wheel in steering field, rather than ackermann wheel angle
-    converted_msg.steering_angle = ratio(a.ackermann_angle);
+    msg.steering_angle = ratio(a.ackermann_angle);
 
-    // Throttle percent (encoded as a speed as per a twist message) is in the accell field
-    converted_msg.acceleration = twist->linear.x;
+    // Throttle percent (encoded as a speed as per a twist message) is in the accel field
+    msg.acceleration = static_cast<float>(twist->linear.x);
 
     // Encoder values (odom in sims case) is in the speed field
-    converted_msg.speed = odom->twist.twist.linear.x;
-    converted_msg.jerk = 0.0;
-    validate_msg(converted_msg);
-    this->_odom_acks_pub->publish(converted_msg);
+    msg.speed = static_cast<float>(odom->twist.twist.linear.x);
+    msg.jerk = 0.0;
+    return msg;
 }
+
+void gir::GzIoRos::publish(ackermann_msgs::msg::AckermannDrive msg) { _odom_acks_pub->publish(msg); }
 
 void gir::GzIoRos::odom_cb(nav_msgs::msg::Odometry::SharedPtr odom) {
     //Since twist messages aren't constant there will be situations where we have odom and no twist,
@@ -52,9 +50,9 @@ void gir::GzIoRos::odom_cb(nav_msgs::msg::Odometry::SharedPtr odom) {
 
     if (!this->odom_queue.empty()) {
         if (this->twist_queue.empty()) {
-            convert_data(odom_queue.front(), std::make_shared<geometry_msgs::msg::Twist>(zero_twist));
+            publish(convert_data(odom_queue.front(), std::make_shared<geometry_msgs::msg::Twist>(zero_twist)));
         } else {
-            convert_data(odom_queue.front(), twist_queue.front());
+            publish(convert_data(odom_queue.front(), twist_queue.front()));
             twist_queue.pop_front();
         }
         odom_queue.pop_front();
@@ -69,23 +67,8 @@ void gir::GzIoRos::twist_cb(geometry_msgs::msg::Twist::SharedPtr twist) {
     this->twist_queue.push_back(twist);
 
     if (!this->twist_queue.empty() && !this->odom_queue.empty()) {
-        convert_data(odom_queue.front(), twist_queue.front());
+        publish(convert_data(odom_queue.front(), twist_queue.front()));
         odom_queue.pop_front();
         twist_queue.pop_front();
-    }
-}
-void gir::GzIoRos::validate_msg(ackermann_msgs::msg::AckermannDrive& msg) {
-    if (msg.acceleration < _max_braking_speed) {
-        RCLCPP_WARN(this->get_logger(), "Were attempting to go beyond max braking speed! Speed value received: %f",
-                    msg.acceleration);
-        msg.acceleration = _max_braking_speed; //TODO IMO we shouldn't overwrite the values here, since this is supposed to be odom, the state of the vehicle. Data logger will already drop invalid commands, so this will force us to record bad data, since sim will still execute the bad command
-    } else if (msg.acceleration > _max_throttle_speed) {
-        RCLCPP_WARN(this->get_logger(), "Were attempting to go beyond max throttle speed! Speed value received: %f",
-                    msg.acceleration);
-        msg.acceleration = _max_throttle_speed;
-    } else if (msg.steering_angle > _max_steering_rad || msg.steering_angle < (-1 * _max_steering_rad)) {
-        RCLCPP_WARN(this->get_logger(), "Were attempting to go beyond max steering angle! Value received: %f",
-                    msg.steering_angle);
-        msg.steering_angle = _max_steering_rad;
     }
 }

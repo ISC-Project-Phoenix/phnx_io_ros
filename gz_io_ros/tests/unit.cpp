@@ -4,7 +4,7 @@
 
 #include "gz_io_ros/gz_io_ros.hpp"
 
-TEST(GzIoRosTests, MsgConvertTest) {
+TEST(gz_io_ros, MsgConvertTest) {
     //Test that output ackermann messages are being converted correctly
     rclcpp::NodeOptions opts;
     gir::GzIoRos node{opts};
@@ -14,28 +14,10 @@ TEST(GzIoRosTests, MsgConvertTest) {
     t->linear.x = 5.0;
     t->angular.z = 1.57;
     o->twist.twist.linear.x = 2.5;
-    node.convert_data(o, t);
-
-}
-
-TEST(GzIoRosTests, MsgValidateTest){
-    rclcpp::NodeOptions opts;
-    gir::GzIoRos node{opts};
-    float VALID_ANGLE = 1.57;
-    float VALID_SPEED = 5.0;
-    float VALID_ACCEL = 5.0;
-    float INVALID_ANGLE = 30.0;
-    float INVALID_SPEED = 30.0;
-    float INVALID_ACCEL = 30.0;
-    ackermann_msgs::msg::AckermannDrive msg;
-    msg.steering_angle = VALID_ANGLE;
-    msg.acceleration = VALID_SPEED;
-    msg.speed = VALID_ACCEL;
-    node.validate_msg(msg);
-    EXPECT_EQ(msg.steering_angle, VALID_ANGLE);
-    EXPECT_EQ(msg.speed, VALID_SPEED);
-    EXPECT_EQ(msg.acceleration, VALID_ACCEL);
-
+    ackermann_msgs::msg::AckermannDrive msg = node.convert_data(o, t);
+    ASSERT_FLOAT_EQ(msg.acceleration, t->linear.x) << "Acceleration must be equal to twist's linear x!";
+    ASSERT_FLOAT_EQ(msg.speed, o->twist.twist.linear.x) << "Speed must be equal to odom's linear x!";
+    ASSERT_FLOAT_EQ(msg.jerk, 0.0) << "Jerk must be equal to zero!";
 }
 
 int main(int argc, char** argv) {

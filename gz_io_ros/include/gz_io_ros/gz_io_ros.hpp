@@ -26,7 +26,8 @@ public:
     ///@brief Convert odom/twist data to one Ackeramann message in defined format
     ///@param odom Odom message to convert
     ///@param twist Twist message to convert
-    void convert_data(nav_msgs::msg::Odometry::ConstSharedPtr odom, geometry_msgs::msg::Twist::ConstSharedPtr twist);
+    ackermann_msgs::msg::AckermannDrive convert_data(nav_msgs::msg::Odometry::ConstSharedPtr odom,
+                                                     geometry_msgs::msg::Twist::ConstSharedPtr twist) const;
 
     ///@breif Callback for new odom messages
     ///@param odom New message from topic
@@ -36,9 +37,10 @@ public:
     ///@param twist New message from topic
     void twist_cb(geometry_msgs::msg::Twist::SharedPtr twist);
 
-    ///@breif Validate that converted data is within parameters and bound message if not
-    ///@param msg AckermannDrive message to check
-    void validate_msg(ackermann_msgs::msg::AckermannDrive &msg);
+    ///@breif publishes ackermann message
+    ///@param msg message to publish
+    void publish(ackermann_msgs::msg::AckermannDrive msg);
+
 private:
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDrive>::SharedPtr _odom_acks_pub;
 
@@ -51,10 +53,7 @@ private:
     ackermann_msgs::msg::AckermannDrive converted_msg{};
 
     unsigned long max_buf_size{15};
-    float _max_throttle_speed{};
-    float _max_braking_speed{};
-    float _wheelbase{};
-    float _max_steering_rad{};
+    double _wheelbase{};
 };
 
 }  // namespace gir

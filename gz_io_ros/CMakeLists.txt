@@ -6,16 +6,6 @@ if (CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif ()
 
-# Default to C99
-if (NOT CMAKE_C_STANDARD)
-    set(CMAKE_C_STANDARD 99)
-endif ()
-
-# Default to C++17
-if (NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 17)
-endif ()
-
 FetchContent_Declare(
         libackermann
         GIT_REPOSITORY https://github.com/iscumd/libackermann.git
@@ -63,7 +53,7 @@ if (BUILD_TESTING)
     ament_add_gtest(${PROJECT_NAME}-test
             tests/unit.cpp
             src/gz_io_ros_node.cpp
-           )
+            )
     ament_target_dependencies(${PROJECT_NAME}-test ${dependencies})
     target_include_directories(${PROJECT_NAME}-test PUBLIC
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
