@@ -1,7 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <geometry_msgs/msg/twist.hpp>
-#include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include "gz_io_ros/gz_io_ros.hpp"
