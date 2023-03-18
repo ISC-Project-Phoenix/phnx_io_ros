@@ -33,7 +33,7 @@ with '[data_logger](https://github.com/ISC-Project-Phoenix/data_logger)'
 #### Publishes
 
 - `/odom_ack`: AckermannDrive messages that contain the current steering, speed and throttle/brake percentage. Steering
-  values and speed are stored in there respective fields, however the acceleration field store either the current
+  values and speed are stored in their respective fields, however the acceleration field store either the current
   braking
   percentage or current throttle percentage depending on the received twist message. Note that
   the `steering_angle_velocity`
@@ -46,9 +46,7 @@ with '[data_logger](https://github.com/ISC-Project-Phoenix/data_logger)'
 
 ### Params
 
-- `max_throttle_speed`: Velocity at which we consider the throttle fully pressed.
-- `max_braking_speed`: Negative velocity at which we consider the brake fully pressed.
-- `max_steering_rad`:  Max steering wheel angle, in radians. Assumed to be symmetrical.
+- `wheel_base`: Wheelbase of the kart, should match both sim and real life
 
 ### Misc
 
