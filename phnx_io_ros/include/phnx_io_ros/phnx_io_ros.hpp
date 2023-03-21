@@ -5,6 +5,7 @@
 #include "phnx_io_ros/serial.hpp"
 #include "rclcpp/logger.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "robot_state_msgs/srv/set_state.hpp"
 
 namespace pir {
 
@@ -15,6 +16,7 @@ enum CanMappings {
     UnlockBrake = 0x3,
     SetAngle = 0x4,
     SetThrottle = 0x6,
+    EncoderTick = 0x7,
     TrainingMode = 0x8,
 };
 
@@ -29,6 +31,8 @@ private:
 
     std::optional<std::shared_ptr<rclcpp::Publisher<ackermann_msgs::msg::AckermannDrive>>> _odom_acks_pub =
         std::nullopt;
+
+    rclcpp::Client<robot_state_msgs::srv::SetState>::SharedPtr _robot_state_client;
 
     rclcpp::TimerBase::SharedPtr read_timer_;
 
@@ -47,6 +51,8 @@ private:
     double _max_throttle_speed{};
     double _max_brake_speed{};
     ackermann_msgs::msg::AckermannDrive last_ack{};
+    robot_state_msgs::srv::SetState::Request::SharedPtr request =
+        std::make_shared<robot_state_msgs::srv::SetState::Request>();
 
     ///@brief Convert ackermann messages into CAN messages and send them to the
     /// CAN bus
@@ -55,6 +61,9 @@ private:
 
     ///@breif Reads data of size serial::message from connected port
     void read_data();
+
+    ///@brief Handles automatically failing over to a second interface teensy if needed
+    void auto_fail_over();
 };
 
 }  // namespace pir

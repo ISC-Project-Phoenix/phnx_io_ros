@@ -15,6 +15,7 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", opt
     _odom_acks_pub = this->create_publisher<ackermann_msgs::msg::AckermannDrive>("/odom_ack", 10);
     _acks_sub = this->create_subscription<ackermann_msgs::msg::AckermannDrive>(
         "/ack_vel", 10, std::bind(&PhnxIoRos::send_can_cb, this, std::placeholders::_1));
+    _robot_state_client = this->create_client<robot_state_msgs::srv::SetState>("/robot/set_state");
 
     port = serial::serial(this->get_logger());
 
@@ -70,13 +71,7 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
         // We failed a write so we need to check and see if fail-over is enabled
         RCLCPP_ERROR(this->get_logger(), "Failed to write message to teensy device! using fd: %d",
                      ports.at(current_device).port_number);
-        /*if (fail_over_enabled && !fail_over_tripped) {
-            // We have fail-over available and fail-over hasn't already been tripped
-            // fail_over_tripped = true;
-            // current_device++;
-        } else {
-            // HANDLE SINGLE TEENSY RUNNING HERE
-        }*/
+        auto_fail_over();
     }
 
     // send steering angle message
@@ -84,9 +79,11 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     ser_msg.data[0] = static_cast<uint8_t>(msg->steering_angle);
     RCLCPP_INFO(this->get_logger(), "Attempting to send message with type: %u, data: %u", ser_msg.type,
                 ser_msg.data[0]);
+
     if (port.write_packet(port.get_ports().at(current_device).port_number, reinterpret_cast<uint8_t*>(&ser_msg),
                           sizeof(serial::message)) == static_cast<uint32_t>(-1)) {
         RCLCPP_ERROR(this->get_logger(), "Failed to write message to teensy device!");
+        auto_fail_over();
     }
 }
 
@@ -98,10 +95,12 @@ void pir::PhnxIoRos::read_data() {
     } else {
         auto* msg = reinterpret_cast<serial::message*>(&read_buf);
         switch (msg->type) {
-            case 0:
+            case CanMappings::KillAuton:
                 RCLCPP_WARN(this->get_logger(), "Received auton_kill message!");
+                request->state.state = robot_state_msgs::msg::State::KILL;
+                _robot_state_client->async_send_request(request);
                 break;
-            case 7:
+            case CanMappings::EncoderTick:
                 RCLCPP_INFO(this->get_logger(), "Received encoder message!");
                 if (can_msgs.size() > 15) {
                     can_msgs.clear();
@@ -110,6 +109,10 @@ void pir::PhnxIoRos::read_data() {
                 break;
         }
     }
+}
+
+void pir::PhnxIoRos::auto_fail_over() {
+    //TODO: Implement auto fail over
 }
 
 pir::PhnxIoRos::~PhnxIoRos() {
