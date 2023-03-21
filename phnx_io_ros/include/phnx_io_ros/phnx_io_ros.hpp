@@ -36,6 +36,7 @@ private:
     serial::serial port;
     std::string _port_pattern{};
     std::vector<serial::port_info> ports;
+    std::list<serial::message> can_msgs;
     char read_buf{};
     long _baud_rate{};
     int current_device{0};
