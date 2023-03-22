@@ -23,7 +23,7 @@ struct message {
 /// Contains the name of the serial port file and the file descriptor of the
 /// port if connected
 struct port_info {
-    char* port_name;
+    std::string port_name;
     int port_number;
 };
 
@@ -74,13 +74,13 @@ public:
     ///@param length length of data to read
     ///@param port_num file descriptor for a connected port
     ///@return number of bytes read
-    uint32_t read_packet(int port_num, char* buf, int length) const;
+    static uint32_t read_packet(int port_num, char* buf, int length) ;
 
     /// Write data to a connected serial port
     ///@param buf data to write to the port
     ///@param length length of data
     ///@param port_num file descriptor for a connected port
     ///@return number of bytes written
-    uint32_t write_packet(int port_num, uint8_t* buf, int length) const;
+    static uint32_t write_packet(int port_num, uint8_t* buf, int length) ;
 };
 }  // namespace serial

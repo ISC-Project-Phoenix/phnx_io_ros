@@ -58,14 +58,13 @@ void serial::serial::connect(const std::string& str, long baud) {
     }
 
     // Store port file descriptor with string name
-    /*
-  for (auto i: this->ports) {
-      if (strcmp(str.c_str(), i.port_name) == 0) {
-          i.port_number = result;
-          break;
-      }
-  }*/
-    this->ports.at(0).port_number = result;
+    for (auto i : this->ports) {
+        if (strcmp(str.c_str(), i.port_name.c_str()) == 0) {
+            i.port_number = result;
+            break;
+        }
+    }
+    //this->ports.at(0).port_number = result;
 
     logger("Connected to serial port!", 0);
     configure(termios_baud, result);
@@ -103,12 +102,12 @@ void serial::serial::configure(speed_t baud, int port_num) {
     logger("Serial port configured!", 0);
 }
 
-uint32_t serial::serial::read_packet(int port_num, char* buf, int length) const {
+uint32_t serial::serial::read_packet(int port_num, char* buf, int length) {
     uint32_t len = read(port_num, buf, length);
     return len;
 }
 
-uint32_t serial::serial::write_packet(int port_num, uint8_t* buf, int length) const {
+uint32_t serial::serial::write_packet(int port_num, uint8_t* buf, int length) {
     return write(port_num, buf, length);
 }
 

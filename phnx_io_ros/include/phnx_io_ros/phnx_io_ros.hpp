@@ -39,13 +39,13 @@ private:
     // Serial port params
     serial::serial port;
     std::string _port_pattern{};
-    std::vector<serial::port_info> ports;
+    std::vector<int> used_ports{};
     std::list<serial::message> can_msgs;
     char read_buf{};
     long _baud_rate{};
-    int current_device{0};
+    //File descriptor number of device were using, used to determine what device to write/read to
+    int current_device{-1};
     bool fail_over_enabled{false};
-    bool fail_over_tripped{false};
 
     // Kart control params
     double _max_throttle_speed{};
