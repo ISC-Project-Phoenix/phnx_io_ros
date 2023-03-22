@@ -74,13 +74,13 @@ public:
     ///@param length length of data to read
     ///@param port_num file descriptor for a connected port
     ///@return number of bytes read
-    static uint32_t read_packet(int port_num, char* buf, int length) ;
+    static uint32_t read_packet(int port_num, char* buf, int length);
 
     /// Write data to a connected serial port
     ///@param buf data to write to the port
     ///@param length length of data
     ///@param port_num file descriptor for a connected port
     ///@return number of bytes written
-    static uint32_t write_packet(int port_num, uint8_t* buf, int length) ;
+    static uint32_t write_packet(int port_num, uint8_t* buf, int length);
 };
 }  // namespace serial

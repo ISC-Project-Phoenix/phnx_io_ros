@@ -107,9 +107,7 @@ uint32_t serial::serial::read_packet(int port_num, char* buf, int length) {
     return len;
 }
 
-uint32_t serial::serial::write_packet(int port_num, uint8_t* buf, int length) {
-    return write(port_num, buf, length);
-}
+uint32_t serial::serial::write_packet(int port_num, uint8_t* buf, int length) { return write(port_num, buf, length); }
 
 void serial::serial::close_connection(int port_num) const {
     int result = close(port_num);

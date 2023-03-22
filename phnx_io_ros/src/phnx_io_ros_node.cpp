@@ -26,7 +26,7 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", opt
     for (const auto& i : port.get_ports()) {
         port.connect(i.port_name, _baud_rate);
         //if the port we just connected on successfully connected then enter that fd as the current device number to use
-        if(i.port_number != -1 && current_device != -1){
+        if (i.port_number != -1 && current_device != -1) {
             current_device = i.port_number;
         }
     }
@@ -69,11 +69,10 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     RCLCPP_INFO(this->get_logger(), "Attempting to send message with type: %u, data: %u", ser_msg.type,
                 ser_msg.data[0]);
 
-    if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&ser_msg),
-                          sizeof(serial::message)) == static_cast<uint8_t>(-1)) {
+    if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&ser_msg), sizeof(serial::message)) ==
+        static_cast<uint8_t>(-1)) {
         // We failed a write so we need to check and see if fail-over is enabled
-        RCLCPP_ERROR(this->get_logger(), "Failed to write message to teensy device! using fd: %d",
-                     current_device);
+        RCLCPP_ERROR(this->get_logger(), "Failed to write message to teensy device! using fd: %d", current_device);
         auto_fail_over();
     }
 
@@ -83,16 +82,15 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     RCLCPP_INFO(this->get_logger(), "Attempting to send message with type: %u, data: %u", ser_msg.type,
                 ser_msg.data[0]);
 
-    if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&ser_msg),
-                          sizeof(serial::message)) == static_cast<uint32_t>(-1)) {
+    if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&ser_msg), sizeof(serial::message)) ==
+        static_cast<uint32_t>(-1)) {
         RCLCPP_ERROR(this->get_logger(), "Failed to write message to teensy device!");
         auto_fail_over();
     }
 }
 
 void pir::PhnxIoRos::read_data() {
-    if (serial::serial::read_packet(current_device, &read_buf, sizeof(serial::message)) ==
-        static_cast<uint8_t>(-1)) {
+    if (serial::serial::read_packet(current_device, &read_buf, sizeof(serial::message)) == static_cast<uint8_t>(-1)) {
         RCLCPP_ERROR(this->get_logger(), "Failed to read message from teensy device using fd: %d",
                      port.get_ports().at(0).port_number);
     } else {
@@ -116,11 +114,10 @@ void pir::PhnxIoRos::read_data() {
 
 void pir::PhnxIoRos::auto_fail_over() {
     //TODO: Implement auto fail over
-    if(fail_over_enabled){
+    if (fail_over_enabled) {
         //Fail-over is available so attempt to find another teensy device connected to the computer to use
         used_ports.push_back(current_device);
-    }
-    else{
+    } else {
         RCLCPP_FATAL(this->get_logger(), "We've lost connection to the Teensy device!");
         request->state.state = robot_state_msgs::msg::State::KILL;
         _robot_state_client->async_send_request(request);
