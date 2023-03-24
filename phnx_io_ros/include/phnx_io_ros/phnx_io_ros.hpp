@@ -40,7 +40,7 @@ private:
     serial::serial port;
     std::string _port_pattern{};
     std::vector<int> used_ports{};
-    std::list<serial::message> can_msgs;
+    std::list<serial::enc_msg> enc_msgs;
     char read_buf{};
     long _baud_rate{};
     //File descriptor number of device were using, used to determine what device to write/read to

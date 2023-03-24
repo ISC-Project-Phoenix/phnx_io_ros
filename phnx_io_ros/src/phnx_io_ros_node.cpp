@@ -30,6 +30,7 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", opt
             current_device = i.port_number;
         }
     }
+    RCLCPP_INFO(this->get_logger(), "Set current device to device: %s, %d", port.get_ports().front().port_name.c_str(), port.get_ports().front().port_number);
 
     if (port.get_ports().size() < 2) {
         RCLCPP_WARN(this->get_logger(), "Only one device found! Automated fail-over not available!!!");
@@ -45,9 +46,9 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     ackermann_msgs::msg::AckermannDrive pub_msg;
     pub_msg.acceleration = msg->speed;
     pub_msg.steering_angle = msg->steering_angle;
-    if (!can_msgs.empty()) {
-        pub_msg.speed = can_msgs.front().data[0];
-        can_msgs.pop_front();
+    if (!enc_msgs.empty()) {
+        pub_msg.speed = enc_msgs.front().speed;
+        enc_msgs.pop_front();
     } else {
         pub_msg.speed = 0.0;
     }
@@ -73,7 +74,7 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
         static_cast<uint8_t>(-1)) {
         // We failed a write so we need to check and see if fail-over is enabled
         RCLCPP_ERROR(this->get_logger(), "Failed to write message to teensy device! using fd: %d", current_device);
-        auto_fail_over();
+        //auto_fail_over();
     }
 
     // send steering angle message
@@ -85,15 +86,16 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&ser_msg), sizeof(serial::message)) ==
         static_cast<uint32_t>(-1)) {
         RCLCPP_ERROR(this->get_logger(), "Failed to write message to teensy device!");
-        auto_fail_over();
+        //auto_fail_over();
     }
 }
 
 void pir::PhnxIoRos::read_data() {
+    RCLCPP_INFO(this->get_logger(), "Attempting to read from port!");
     if (serial::serial::read_packet(current_device, &read_buf, sizeof(serial::message)) == static_cast<uint8_t>(-1)) {
-        RCLCPP_ERROR(this->get_logger(), "Failed to read message from teensy device using fd: %d",
-                     port.get_ports().at(0).port_number);
+        RCLCPP_ERROR(this->get_logger(), "Failed to read message from teensy device using fd: %d", current_device);
     } else {
+        RCLCPP_INFO(this->get_logger(), "Successfully read from port!");
         auto* msg = reinterpret_cast<serial::message*>(&read_buf);
         switch (msg->type) {
             case CanMappings::KillAuton:
@@ -103,10 +105,11 @@ void pir::PhnxIoRos::read_data() {
                 break;
             case CanMappings::EncoderTick:
                 RCLCPP_INFO(this->get_logger(), "Received encoder message!");
-                if (can_msgs.size() > 15) {
-                    can_msgs.clear();
+                if (enc_msgs.size() > 15) {
+                    enc_msgs.clear();
                 }
-                can_msgs.push_back(*msg);
+                //Convert generic message's data field into ticks and speed values
+                enc_msgs.push_back(*(reinterpret_cast<serial::enc_msg*>(*msg->data)));
                 break;
         }
     }

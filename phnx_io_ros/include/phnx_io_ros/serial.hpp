@@ -20,8 +20,13 @@ struct message {
     uint8_t data[512];
 } __attribute__((packed));
 
+struct enc_msg {
+    uint16_t ticks;
+    float speed;
+} __attribute__((packed));
+
 /// Contains the name of the serial port file and the file descriptor of the
-/// port if connected
+/// port, if device on port not connected then port_number will be -1
 struct port_info {
     std::string port_name;
     int port_number;
@@ -31,7 +36,7 @@ class serial {
 private:
     struct termios tty {};
     rclcpp::Logger* log = nullptr;
-    std::vector<port_info> ports;
+    std::list<port_info> ports;
 
     /// Logs with either RCLCPP logs or normal stdout/stderr
     ///@param str string to write to the log
@@ -56,7 +61,7 @@ public:
     /// Connect and configure a serial port
     ///@param port_name Name of a port to connect to
     ///@param baud baud rate to use
-    void connect(const std::string& port_name, long baud);
+    void connect(std::string port_name, long baud);
 
     /// Closes connection to a serial port
     ///@param port_num file descriptor for a connected port
@@ -64,23 +69,22 @@ public:
 
     /// Get the list of found serial ports, port number will be -1 if port is not
     /// connected
-    ///@return Returns a vector of port info structs containing string filename of
-    ///the
-    ///  port and file descriptor used by termios
-    std::vector<port_info> get_ports();
+    ///@return Returns a list of port info structs containing string filename of
+    ///the port and file descriptor used by termios
+    std::list<port_info> get_ports();
 
     /// Read data from a connected serial port
     ///@param buf buffer to store read data in
     ///@param length length of data to read
     ///@param port_num file descriptor for a connected port
-    ///@return number of bytes read
+    ///@return number of bytes read, -1 returned on error
     static uint32_t read_packet(int port_num, char* buf, int length);
 
     /// Write data to a connected serial port
     ///@param buf data to write to the port
     ///@param length length of data
     ///@param port_num file descriptor for a connected port
-    ///@return number of bytes written
+    ///@return number of bytes written, -1 returned on error
     static uint32_t write_packet(int port_num, uint8_t* buf, int length);
 };
 }  // namespace serial

@@ -30,9 +30,9 @@ void serial::serial::find_ports(const std::string& pattern) {
     }
 }
 
-std::vector<serial::port_info> serial::serial::get_ports() { return this->ports; }
+std::list<serial::port_info> serial::serial::get_ports() { return this->ports; }
 
-void serial::serial::connect(const std::string& str, long baud) {
+void serial::serial::connect(std::string str, long baud) {
     speed_t termios_baud;
     switch (baud) {
         case 9600:
@@ -64,7 +64,7 @@ void serial::serial::connect(const std::string& str, long baud) {
             break;
         }
     }
-    //this->ports.at(0).port_number = result;
+    //this->ports.front().port_number = result;
 
     logger("Connected to serial port!", 0);
     configure(termios_baud, result);
@@ -103,8 +103,7 @@ void serial::serial::configure(speed_t baud, int port_num) {
 }
 
 uint32_t serial::serial::read_packet(int port_num, char* buf, int length) {
-    uint32_t len = read(port_num, buf, length);
-    return len;
+    return read(port_num, buf, length);
 }
 
 uint32_t serial::serial::write_packet(int port_num, uint8_t* buf, int length) { return write(port_num, buf, length); }
