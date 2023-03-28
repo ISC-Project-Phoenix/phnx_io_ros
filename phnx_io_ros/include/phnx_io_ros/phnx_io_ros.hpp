@@ -41,11 +41,10 @@ private:
     std::string _port_pattern{};
     std::vector<int> used_ports{};
     std::list<serial::enc_msg> enc_msgs;
-    char read_buf{};
+    uint8_t read_buf{};
     long _baud_rate{};
     //File descriptor number of device were using, used to determine what device to write/read to
     int current_device{-1};
-    bool fail_over_enabled{false};
 
     // Kart control params
     double _max_throttle_speed{};
@@ -62,8 +61,8 @@ private:
     ///@breif Reads data of size serial::message from connected port
     void read_data();
 
-    ///@brief Handles automatically failing over to a second interface teensy if needed
-    void auto_fail_over();
+    ///@brief Handles automatically failing over to a second interface device if needed
+    void reconnect();
 };
 
 }  // namespace pir

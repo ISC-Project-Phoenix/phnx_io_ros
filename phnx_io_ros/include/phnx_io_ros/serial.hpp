@@ -2,6 +2,7 @@
 
 #include <fcntl.h>  // Contains file controls like O_RDWR
 #include <glob.h>
+#include <libudev.h>
 #include <termios.h>  // Contains POSIX terminal control definitions
 #include <unistd.h>   // write(), read(), close()
 
@@ -44,11 +45,6 @@ private:
     ///and -2 is fatal
     void logger(const std::string& str, int severity) const;
 
-    /// Configure a serial port
-    ///@param port_num file descriptor for a connected port
-    ///@param baud baud rate to use
-    void configure(speed_t baud, int port_num);
-
 public:
     serial() = default;
 
@@ -56,12 +52,17 @@ public:
 
     /// Find serial ports using a given pattern
     ///@param pattern string pattern to use to for search
-    void find_ports(const std::string& pattern);
+    int find_ports(const std::string& pattern);
 
     /// Connect and configure a serial port
-    ///@param port_name Name of a port to connect to
+    ///@param str Name of a port to connect to
     ///@param baud baud rate to use
-    void connect(std::string port_name, long baud);
+    int connect(std::string port_name);
+
+    /// Configure a serial port
+    ///@param port_num file descriptor for a connected port
+    ///@param baud baud rate to use
+    int configure(int port_num, long baud);
 
     /// Closes connection to a serial port
     ///@param port_num file descriptor for a connected port
@@ -78,13 +79,13 @@ public:
     ///@param length length of data to read
     ///@param port_num file descriptor for a connected port
     ///@return number of bytes read, -1 returned on error
-    static uint32_t read_packet(int port_num, char* buf, int length);
+    static uint32_t read_packet(int port_num, uint8_t* buf, uint32_t length);
 
     /// Write data to a connected serial port
     ///@param buf data to write to the port
     ///@param length length of data
     ///@param port_num file descriptor for a connected port
     ///@return number of bytes written, -1 returned on error
-    static uint32_t write_packet(int port_num, uint8_t* buf, int length);
+    static uint32_t write_packet(int port_num, uint8_t* buf, uint32_t length);
 };
 }  // namespace serial

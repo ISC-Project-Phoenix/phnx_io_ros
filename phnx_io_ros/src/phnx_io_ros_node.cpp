@@ -7,10 +7,9 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", opt
     this->_baud_rate = this->declare_parameter("baud_rate", 115200);
     this->_max_throttle_speed = this->declare_parameter("max_throttle_speed", 2.0);
     this->_max_brake_speed = this->declare_parameter("max_brake_speed", 2.0);
-    this->current_device = 0;
 
     // Wall timer to continuously read the current port with
-    read_timer_ = this->create_wall_timer(std::chrono::milliseconds(200), std::bind(&PhnxIoRos::read_data, this));
+    read_timer_ = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&PhnxIoRos::read_data, this));
 
     _odom_acks_pub = this->create_publisher<ackermann_msgs::msg::AckermannDrive>("/odom_ack", 10);
     _acks_sub = this->create_subscription<ackermann_msgs::msg::AckermannDrive>(
@@ -20,23 +19,32 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options) : Node("phnx_io_ros", opt
     port = serial::serial(this->get_logger());
 
     // Find ports connected with the specified pattern
-    port.find_ports(_port_pattern);
+    while (port.find_ports(_port_pattern) != 0) {
+        RCLCPP_ERROR(this->get_logger(), "Failed to find ports with specified search string... %s",
+                     this->_port_pattern.c_str());
+        rclcpp::sleep_for(std::chrono::milliseconds(500));
+    }
+    RCLCPP_INFO(this->get_logger(), "Found serial devices!");
 
     //Connect every port that we found with the specific pattern
-    for (const auto& i : port.get_ports()) {
-        port.connect(i.port_name, _baud_rate);
-        //if the port we just connected on successfully connected then enter that fd as the current device number to use
-        if (i.port_number != -1 && current_device != -1) {
-            current_device = i.port_number;
+    for (auto i : port.get_ports()) {
+        i.port_number = port.connect(i.port_name);
+        while (i.port_number == -1) {
+            RCLCPP_ERROR(this->get_logger(), "Failed to connect to serial port!, Retrying...");
+            rclcpp::sleep_for(std::chrono::milliseconds(500));
+            i.port_number = port.connect(i.port_name);
         }
-    }
-    RCLCPP_INFO(this->get_logger(), "Set current device to device: %s, %d", port.get_ports().front().port_name.c_str(), port.get_ports().front().port_number);
-
-    if (port.get_ports().size() < 2) {
-        RCLCPP_WARN(this->get_logger(), "Only one device found! Automated fail-over not available!!!");
-        fail_over_enabled = false;
-    } else {
-        fail_over_enabled = true;
+        RCLCPP_INFO(this->get_logger(), "Connected to serial port!");
+        while (port.configure(i.port_number, this->_baud_rate) == -1) {
+            RCLCPP_ERROR(this->get_logger(), "Failed to configure serial port!, Retrying...");
+            rclcpp::sleep_for(std::chrono::milliseconds(500));
+        }
+        RCLCPP_INFO(this->get_logger(), "Configured serial port!");
+        //if the port we just connected on successfully connected then enter that fd as the current device number to use
+        if (i.port_number != -1 && current_device == -1) {
+            current_device = i.port_number;
+            RCLCPP_INFO(this->get_logger(), "Set current device to device: %s, %d", i.port_name.c_str(), i.port_number);
+        }
     }
 }
 
@@ -73,8 +81,8 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&ser_msg), sizeof(serial::message)) ==
         static_cast<uint8_t>(-1)) {
         // We failed a write so we need to check and see if fail-over is enabled
-        RCLCPP_ERROR(this->get_logger(), "Failed to write message to teensy device! using fd: %d", current_device);
-        //auto_fail_over();
+        RCLCPP_ERROR(this->get_logger(), "Failed to write message to device! using fd: %d", current_device);
+        //reconnect();
     }
 
     // send steering angle message
@@ -85,18 +93,23 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
 
     if (serial::serial::write_packet(current_device, reinterpret_cast<uint8_t*>(&ser_msg), sizeof(serial::message)) ==
         static_cast<uint32_t>(-1)) {
-        RCLCPP_ERROR(this->get_logger(), "Failed to write message to teensy device!");
-        //auto_fail_over();
+        RCLCPP_ERROR(this->get_logger(), "Failed to write message to device! using fd: %d", current_device);
+        //reconnect();
     }
 }
 
 void pir::PhnxIoRos::read_data() {
     RCLCPP_INFO(this->get_logger(), "Attempting to read from port!");
-    if (serial::serial::read_packet(current_device, &read_buf, sizeof(serial::message)) == static_cast<uint8_t>(-1)) {
-        RCLCPP_ERROR(this->get_logger(), "Failed to read message from teensy device using fd: %d", current_device);
-    } else {
+    uint32_t bytes_read = serial::serial::read_packet(current_device, &read_buf, sizeof(serial::message));
+    if (bytes_read == static_cast<uint32_t>(-1)) {
+        RCLCPP_ERROR(this->get_logger(), "%u, Failed to read message from teensy device using fd: %d", bytes_read,
+                     current_device);
+    } else if (bytes_read > 0 && bytes_read < sizeof(serial::message)) {
         RCLCPP_INFO(this->get_logger(), "Successfully read from port!");
         auto* msg = reinterpret_cast<serial::message*>(&read_buf);
+        RCLCPP_INFO(this->get_logger(), "Message Recieved: Type: %u, Length: %u, Data: %u, %u, %u, %u, %u, %u, %u, %u",
+                    msg->type, msg->length, msg->data[0], msg->data[1], msg->data[2], msg->data[3], msg->data[4],
+                    msg->data[5], msg->data[6], msg->data[7]);
         switch (msg->type) {
             case CanMappings::KillAuton:
                 RCLCPP_WARN(this->get_logger(), "Received auton_kill message!");
@@ -115,16 +128,17 @@ void pir::PhnxIoRos::read_data() {
     }
 }
 
-void pir::PhnxIoRos::auto_fail_over() {
-    //TODO: Implement auto fail over
-    if (fail_over_enabled) {
+void pir::PhnxIoRos::reconnect() {
+    //Attempt to reconnect to another device on write/read failure
+
+    /*if (fail_over_enabled) {
         //Fail-over is available so attempt to find another teensy device connected to the computer to use
         used_ports.push_back(current_device);
     } else {
         RCLCPP_FATAL(this->get_logger(), "We've lost connection to the Teensy device!");
         request->state.state = robot_state_msgs::msg::State::KILL;
         _robot_state_client->async_send_request(request);
-    }
+    }*/
 }
 
 pir::PhnxIoRos::~PhnxIoRos() {
