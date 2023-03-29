@@ -99,7 +99,8 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
 }
 
 void pir::PhnxIoRos::read_data() {
-    RCLCPP_INFO(this->get_logger(), "Attempting to read from port!");
+    //TODO: Fix reading
+    /*RCLCPP_INFO(this->get_logger(), "Attempting to read from port!");
     uint32_t bytes_read = serial::serial::read_packet(current_device, &read_buf, sizeof(serial::message));
     if (bytes_read == static_cast<uint32_t>(-1)) {
         RCLCPP_ERROR(this->get_logger(), "%u, Failed to read message from teensy device using fd: %d", bytes_read,
@@ -125,10 +126,11 @@ void pir::PhnxIoRos::read_data() {
                 enc_msgs.push_back(*(reinterpret_cast<serial::enc_msg*>(*msg->data)));
                 break;
         }
-    }
+    }*/
 }
 
 void pir::PhnxIoRos::reconnect() {
+    //TODO: Implement reconnect
     //Attempt to reconnect to another device on write/read failure
 
     /*if (fail_over_enabled) {
@@ -144,6 +146,8 @@ void pir::PhnxIoRos::reconnect() {
 pir::PhnxIoRos::~PhnxIoRos() {
     // Clean up serial connection
     for (const auto& i : port.get_ports()) {
-        port.close_connection(i.port_number);
+        if (i.port_number != -1) {
+            port.close_connection(i.port_number);
+        }
     }
 }
