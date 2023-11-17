@@ -9,6 +9,7 @@ endif ()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 find_package(ackermann_msgs REQUIRED)
 find_package(webots_ros2_driver REQUIRED)
 find_package(pluginlib REQUIRED)
@@ -28,10 +29,12 @@ ament_target_dependencies(
         "webots_ros2_driver"
         "ackermann_msgs"
         "pluginlib"
+        "nav_msgs"
 )
 
 install(TARGETS
         wb_io_ros
+        EXPORT export_${PROJECT_NAME}
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib
         RUNTIME DESTINATION bin
@@ -49,4 +52,13 @@ if (BUILD_TESTING)
     ament_lint_auto_find_test_dependencies()
 endif ()
 
+ament_export_include_directories(
+        include
+)
+ament_export_libraries(
+        wb_io_ros
+)
+ament_export_targets(
+        export_${PROJECT_NAME}
+)
 ament_package()

@@ -1,25 +1,34 @@
 #include "wb_io_ros/wb_io_ros.hpp"
 
-#include <webots/motor.h>
-#include <webots/robot.h>
-
-#include <cstdio>
 #include <functional>
-
-#include "rclcpp/rclcpp.hpp"
 
 namespace wb_io_ros {
 void WbIoRos::init(webots_ros2_driver::WebotsNode* node, std::unordered_map<std::string, std::string>& parameters) {
-    ack_sub = node->create_subscription<ackermann_msgs::msg::AckermannDrive>(
-        "/ack_vel", rclcpp::SensorDataQoS().reliable(), std::bind(&WbIoRos::ack_cb, this, std::placeholders::_1));
+    wbu_driver_init();
 
-    // TODO get driver api things
+    // Store owning node
+    this->parent = node;
+
+    ack_sub = node->create_subscription<ackermann_msgs::msg::AckermannDrive>(
+        "/ack_vel", 5, std::bind(&WbIoRos::ack_cb, this, std::placeholders::_1));
+    odom_pub = node->create_publisher<nav_msgs::msg::Odometry>("/odom_can", 10);
 }
 
 void WbIoRos::ack_cb(const ackermann_msgs::msg::AckermannDrive::SharedPtr msg) { this->control = *msg; }
 
 void WbIoRos::step() {
-    // TODO assign controls
+    wbu_driver_step();
+
+    // Capture encoder value as odom
+    nav_msgs::msg::Odometry odom{};
+    odom.header.stamp = parent->get_clock()->now();
+    // Convert from kph to mps
+    odom.twist.twist.linear.x = wbu_driver_get_current_speed() / 3.6;
+    this->odom_pub->publish(odom);
+
+    // Actuate the car, converting from ros units
+    wbu_driver_set_cruising_speed(this->control.speed * 3.6);
+    wbu_driver_set_steering_angle(-this->control.steering_angle);
 }
 }  // namespace wb_io_ros
 

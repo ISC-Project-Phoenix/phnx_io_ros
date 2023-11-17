@@ -3,8 +3,8 @@
 <package format="3">
   <name>wb_io_ros</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="Andrew@Ealovega.dev">andy</maintainer>
+  <description>A webots plugin to interface with Phoenix</description>
+  <maintainer email="avealov@umich.edu">andy</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
@@ -12,6 +12,7 @@
   <depend>rclcpp</depend>
   <depend>geometry_msgs</depend>
   <depend>ackermann_msgs</depend>
+  <depend>nav_msgs</depend>
   <depend>webots_ros2_driver</depend>
   <depend>pluginlib</depend>
 
