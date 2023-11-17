@@ -23,7 +23,7 @@ void WbIoRos::step() {
     nav_msgs::msg::Odometry odom{};
     odom.header.stamp = parent->get_clock()->now();
     // Convert from kph to mps
-    odom.twist.twist.linear.x = wbu_driver_get_current_speed() / 3.6;
+    odom.twist.twist.linear.x = wbu_driver_get_current_speed() / 7.2;
     this->odom_pub->publish(odom);
 
     // Actuate the car, converting from ros units
