@@ -10,7 +10,7 @@ void WbIoRos::init(webots_ros2_driver::WebotsNode* node, std::unordered_map<std:
     this->parent = node;
 
     ack_sub = node->create_subscription<ackermann_msgs::msg::AckermannDrive>(
-        "/ack_vel", 5, std::bind(&WbIoRos::ack_cb, this, std::placeholders::_1));
+        "/robot/ack_vel", 5, std::bind(&WbIoRos::ack_cb, this, std::placeholders::_1));
     odom_pub = node->create_publisher<nav_msgs::msg::Odometry>("/odom_can", 10);
 }
 
@@ -24,7 +24,13 @@ void WbIoRos::step() {
     odom.header.stamp = parent->get_clock()->now();
     // Convert from kph to mps
     odom.twist.twist.linear.x = wbu_driver_get_current_speed() / 7.2;
-    this->odom_pub->publish(odom);
+
+    // Sometimes we get nans, remove them here else it breaks the ekf
+    if (!std::isnan(odom.twist.twist.linear.x)) {
+        this->odom_pub->publish(odom);
+    } else {
+        RCLCPP_INFO(parent->get_logger(), "Skipping nan encoder value");
+    }
 
     // Actuate the car, converting from ros units
     wbu_driver_set_cruising_speed(this->control.speed * 3.6);
