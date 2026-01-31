@@ -10,8 +10,11 @@ PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::S
             nav_msgs::msg::Odometry odom;
             this->odom_queue.wait_dequeue(odom);
 
-            // Ensure feedback is in valid range, since encoder can only tick forwards
-            if (odom.twist.twist.linear.x < 0) {
+            // Ensure feedback is in valid range, since we want to zero out the encoder 
+            // when its below the values we care about. 
+            float zero_outter = 0.20
+            if (odom.twist.twist.linear.x > -zero_outter && odom.twist.twist.linear.x < zero_outter) {
+                // zero this out please!
                 odom.twist.twist.linear.x = 0;
             }
 
