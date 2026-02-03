@@ -12,7 +12,7 @@ PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::S
 
             // Ensure feedback is in valid range, since we want to zero out the encoder 
             // when its below the values we care about. 
-            float zero_outter = 0.20
+            float zero_outter = 0.20;
             if (odom.twist.twist.linear.x > -zero_outter && odom.twist.twist.linear.x < zero_outter) {
                 // zero this out please!
                 odom.twist.twist.linear.x = 0;
