@@ -10,11 +10,6 @@ PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::S
             nav_msgs::msg::Odometry odom;
             this->odom_queue.wait_dequeue(odom);
 
-            // Ensure feedback is in valid range, since encoder can only tick forwards
-            if (odom.twist.twist.linear.x < 0) {
-                odom.twist.twist.linear.x = 0;
-            }
-
             // Always set speed, even if not updated, to avoid queuing latency on commands
             {
                 std::unique_lock lk{this->command_mtx};

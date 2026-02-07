@@ -18,28 +18,28 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
 
     // Connect to roboteq over USB
     while (!this->roboteq.connect()) {
-        RCLCPP_INFO(this->get_logger(), "Could not connect to roboteq!");
+        // RCLCPP_INFO(this->get_logger(), "Could not connect to roboteq!");
         rclcpp::sleep_for(std::chrono::milliseconds(500));
     }
     RCLCPP_INFO(this->get_logger(), "Connected to Roboteq!");
 
     // Check voltage on a timer
-    this->voltage_timer = this->create_wall_timer(std::chrono::seconds{1}, [this]() {
-        // Only measure voltage when not killed, as killing the bot will cause the voltage to drop
-        if (!this->killed) {
-            try {
-                auto maybe_voltage = this->roboteq.get_batt_voltage();
+    // this->voltage_timer = this->create_wall_timer(std::chrono::seconds{1}, [this]() {
+    //     // Only measure voltage when not killed, as killing the bot will cause the voltage to drop
+    //     if (!this->killed) {
+    //         try {
+    //             auto maybe_voltage = this->roboteq.get_batt_voltage();
 
-                if (maybe_voltage) {
-                    RCLCPP_INFO(this->get_logger(), "Voltage: %f", *maybe_voltage);  //TODO pub sound if low
-                } else {
-                    RCLCPP_ERROR(this->get_logger(), "Failed read!");
-                }
-            } catch (std::system_error& e) {
-                RCLCPP_ERROR(this->get_logger(), "Failed read with %s", e.what());
-            }
-        }
-    });
+    //             if (maybe_voltage) {
+    //                 RCLCPP_INFO(this->get_logger(), "Voltage: %f", *maybe_voltage);  //TODO pub sound if low
+    //             } else {
+    //                 RCLCPP_ERROR(this->get_logger(), "Failed read!");
+    //             }
+    //         } catch (std::system_error& e) {
+    //             RCLCPP_ERROR(this->get_logger(), "Failed read with %s", e.what());
+    //         }
+    //     }
+    // });
 
     // Find connected interface ECU connected to a USB port
     while (find_devices() != 0) {
@@ -99,6 +99,8 @@ float mapfloat(float x, float in_min, float in_max, float out_min, float out_max
 
 void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr msg) {
     // If killed, make sure we avoid updating the pid, so it says at 0
+
+    // RCLCPP_INFO(this->get_logger(), "TEST TEST");
     if (this->killed) {
         return;
     }
@@ -126,7 +128,7 @@ void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr 
     }
 
     // Send a steering message to the interface device to publish onto the CAN bus
-    RCLCPP_INFO(this->get_logger(), "Sending steer msg with angle: %f", st_msg.angle);
+    // RCLCPP_INFO(this->get_logger(), "Sending steer msg with angle: %f", st_msg.angle);
     if (cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&st_msg), sizeof(serial::steer_msg)) == -1) {
         RCLCPP_ERROR(this->get_logger(), "Failed to write message to device: %s with fd: %d",
                      cur_device.port_name.c_str(), cur_device.handler->get_fd());
@@ -184,12 +186,12 @@ void pir::PhnxIoRos::read_data(serial::message m) {
                 std::unique_lock lk{this->last_steering_mtx};
 
                 odom.twist.twist.linear.x = msg->speed;
-//                odom.twist.twist.linear.y = 0;
+                //                odom.twist.twist.linear.y = 0;
                 odom.header.stamp = this->get_clock()->now();
 
-//                odom.twist.covariance.at(0) = TODO in theory these lines represent the encoder better, needs tuning
-//                    0.05 * std::abs(last_steering_angle) + 0.001;  // x has more error when turning
-//                odom.twist.covariance.at(7) = 0.001;               // y, we cannot move in y
+                //                odom.twist.covariance.at(0) = TODO in theory these lines represent the encoder better, needs tuning
+                //                    0.05 * std::abs(last_steering_angle) + 0.001;  // x has more error when turning
+                //                odom.twist.covariance.at(7) = 0.001;               // y, we cannot move in y
             }
 
             this->_odom_pub->publish(odom);
@@ -207,7 +209,7 @@ void pir::PhnxIoRos::filtered_odom_cb(nav_msgs::msg::Odometry::ConstSharedPtr ms
     }
 
     this->pid->add_feedback(*msg);
-    RCLCPP_INFO(this->get_logger(), "Speed: %f", msg->twist.twist.linear.x);
+    // RCLCPP_INFO(this->get_logger(), "Speed: %f", msg->twist.twist.linear.x);
 }
 
 void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedController::Actuator> control) {
@@ -218,24 +220,25 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
 
     auto [val, actuator] = control;
 
-    RCLCPP_INFO(this->get_logger(), "Sending drive msg with level: %f and actuator: %u", val, uint32_t(actuator));
+    // RCLCPP_INFO(this->get_logger(), "Sending drive msg with level: %f and actuator: %u", val, uint32_t(actuator));
 
     serial::drive_msg throttle{};
     serial::drive_msg brake{};
 
     // Fit to limits
-    val = std::clamp(val, 0.0, 1.0);
+    val = std::clamp(val, -1.0, 1.0);
 
     if (actuator == phnx_control::SpeedController::Actuator::Throttle) {
         // Set throttle to control, and zero brake
         throttle.type = CanMappings::SetThrottle;
-        throttle.speed = uint8_t(val * 100);
+        throttle.speed = uint8_t(std::abs(val) * 100);
 
         brake.type = CanMappings::SetBrake;
         brake.speed = 0;
 
-        // Send commands to can
-        RCLCPP_INFO(this->get_logger(), "Sending throttle command: %f", val);
+        // Send commands to can, only the brakes use can *
+        // RCLCPP_INFO(this->get_logger(), "Sending throttle command: %f", val);
+        // actual power demand no longer handled thru can, kept just in case.
         auto wrt_res = this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&throttle), sizeof(throttle));
         wrt_res += this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&brake), sizeof(brake));
 
@@ -248,7 +251,7 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
             bool res = this->roboteq.set_power(float(val));
 
             if (res) {
-                RCLCPP_ERROR(this->get_logger(), "Roboteq responded with non + !");
+                // RCLCPP_ERROR(this->get_logger(), "Roboteq responded with non + !");
             }
         } catch (std::system_error& error) {
             RCLCPP_ERROR(this->get_logger(), "Writing to Roboteq failed with: %s", error.what());
@@ -259,11 +262,13 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
         throttle.speed = 0;
 
         brake.type = CanMappings::SetBrake;
-        brake.speed = uint8_t(val * 100);
+        brake.speed = uint8_t(std::abs(val) * 100);
 
         // Send commands to can
         RCLCPP_INFO(this->get_logger(), "Sending brake command: %f", val);
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&throttle), sizeof(throttle));
+        // previous line sends can message, but roboteq (and commanded speed) is not handled thru can
+        this->roboteq.set_power(0.0f);
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&brake), sizeof(brake));
     }
 }
