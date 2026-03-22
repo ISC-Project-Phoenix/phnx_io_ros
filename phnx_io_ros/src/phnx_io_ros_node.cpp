@@ -4,7 +4,7 @@
 #include "phnx_io_ros/phnx_io_ros.hpp"
 
 pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
-    : Node("phnx_io_ros", options), roboteq(this->declare_parameter<float>("motor_scale", 0.2)) {
+    : Node("phnx_io_ros", options), roboteq(this->declare_parameter<float>("motor_scale", 0.35)) {
     this->_port_pattern =
         this->declare_parameter("port_search_pattern", "/dev/serial/by-id/usb-Teensyduino_USB_Serial*");
     this->_baud_rate = this->declare_parameter("baud_rate", 115200);
