@@ -1,4 +1,5 @@
 #include "phnx_io_ros/pid_interface.hpp"
+#include <rclcpp/rclcpp.hpp>
 
 PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::SpeedController::Actuator>)> cb)
     : cb(std::move(cb)) {
