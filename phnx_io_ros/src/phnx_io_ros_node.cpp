@@ -69,7 +69,7 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
 
     double kP = this->get_parameter("kP").as_double();
     double kI = this->get_parameter("kI").as_double();
-    double dI= this->get_parameter("kD").as_double();
+    double kD = this->get_parameter("kD").as_double();
 
     // Start pid thread
     this->pid = std::make_unique<PidInterface>(std::bind(&PhnxIoRos::handle_pid_update, this, std::placeholders::_1), kP, kI, kD);
