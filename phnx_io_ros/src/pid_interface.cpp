@@ -1,16 +1,10 @@
 #include "phnx_io_ros/pid_interface.hpp"
 #include <rclcpp/rclcpp.hpp>
 
-PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::SpeedController::Actuator>)> cb)
+PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::SpeedController::Actuator>)> cb, double kP, double kI, double kD)
     : cb(std::move(cb)) {
     //PID Value params
-    this->declare_parameter("kP", 1.0);
-    this->declare_parameter("kI", 1.0);
-    this->declare_parameter("kD", 0.1);
-
-    double kP = this->get_parameter("kP").as_double();
-    double kI = this->get_parameter("kI").as_double();
-    double dI= this->get_parameter("kD").as_double();
+    
     phnx_control::SpeedController pid{kP, kI, kD};
         
     // Setup control thread
