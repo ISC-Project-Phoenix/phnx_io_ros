@@ -27,7 +27,7 @@ class PidInterface {
     std::atomic<bool> stop_flag{false};
 
 public:
-    explicit PidInterface(std::function<void(std::tuple<double, phnx_control::SpeedController::Actuator>)> cb);
+    explicit PidInterface(std::function<void(std::tuple<double, phnx_control::SpeedController::Actuator>)> cb, double kP, double kI, double kD);
 
     /// Add speed of vehicle to feedback the PID. This runs the control loop, and ultimately calls the callback with
     /// the result.
