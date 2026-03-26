@@ -11,7 +11,7 @@
 /// Threadsafe wrapper around PID
 class PidInterface {
     /// Controller
-    phnx_control::SpeedController pid{1.3, 1.2, 0.13};
+    phnx_control::SpeedController pid;
     /// Control thread
     std::thread thread;
     /// Odom queue
