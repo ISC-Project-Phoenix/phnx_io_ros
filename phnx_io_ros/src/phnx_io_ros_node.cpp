@@ -233,7 +233,7 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
     if (actuator == phnx_control::SpeedController::Actuator::Throttle) {
         // Set throttle to control, and zero brake
         throttle.type = CanMappings::SetThrottle;
-        throttle.speed = uint8_t(val * 100);
+        throttle.speed = uint8_t(val);
 
         brake.type = CanMappings::SetBrake;
         brake.speed = 0;
