@@ -4,10 +4,15 @@
 PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::SpeedController::Actuator>)> cb)
     : cb(std::move(cb)) {
     //PID Value params
-    double kP = this->declare_parameter("kP", 1.0);
-    double kI = this->declare_parameter("kI", 1.0);
-    double kD = this->declare_parameter("kD", 0.1);
+    this->declare_parameter("kP", 1.0);
+    this->declare_parameter("kI", 1.0);
+    this->declare_parameter("kD", 0.1);
+
+    double kP = this->get_parameter("kP").as_double();
+    double kI = this->get_parameter("kI").as_double();
+    double dI= this->get_parameter("kD").as_double();
     phnx_control::SpeedController pid{kP, kI, kD};
+        
     // Setup control thread
     this->thread = std::thread{[this]() {
         // This loop runs at the speed of odom
