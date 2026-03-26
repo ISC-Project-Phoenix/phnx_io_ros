@@ -63,8 +63,16 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
 
     RCLCPP_INFO(this->get_logger(), "Connected to device!");
 
+    this->declare_parameter("kP", 1.0);
+    this->declare_parameter("kI", 1.0);
+    this->declare_parameter("kD", 0.1);
+
+    double kP = this->get_parameter("kP").as_double();
+    double kI = this->get_parameter("kI").as_double();
+    double dI= this->get_parameter("kD").as_double();
+
     // Start pid thread
-    this->pid = std::make_unique<PidInterface>(std::bind(&PhnxIoRos::handle_pid_update, this, std::placeholders::_1));
+    this->pid = std::make_unique<PidInterface>(std::bind(&PhnxIoRos::handle_pid_update, this, std::placeholders::_1), kP, kI, kD);
 
     /* Now we have three threads:
      * 1) Main node thread subs and pubs, as well as Roboteq voltage
