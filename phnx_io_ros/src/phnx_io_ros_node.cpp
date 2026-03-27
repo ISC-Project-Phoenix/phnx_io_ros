@@ -71,6 +71,13 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
     double kI = this->get_parameter("kI").as_double();
     double kD = this->get_parameter("kD").as_double();
 
+    // Print current PID Values
+    RCLCPP_INFO(this->get_logger(), "--- Speed Controller PID Settings ---");
+    RCLCPP_INFO(this->get_logger(), "kP: %.4f", kP);
+    RCLCPP_INFO(this->get_logger(), "kI: %.4f", kI);
+    RCLCPP_INFO(this->get_logger(), "kD: %.4f", kD);
+    RCLCPP_INFO(this->get_logger(), "------------------------------------");
+
     // Start pid thread
     this->pid = std::make_unique<PidInterface>(std::bind(&PhnxIoRos::handle_pid_update, this, std::placeholders::_1), kP, kI, kD);
 

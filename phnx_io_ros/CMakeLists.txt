@@ -81,4 +81,8 @@ if (BUILD_TESTING)
     target_link_libraries(${PROJECT_NAME}-test CppLinuxSerial::CppLinuxSerial)
 endif ()
 
+install(DIRECTORY config
+  DESTINATION share/${PROJECT_NAME}
+)
+
 ament_package()
