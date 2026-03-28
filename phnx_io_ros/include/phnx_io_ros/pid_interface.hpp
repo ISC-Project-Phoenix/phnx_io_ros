@@ -5,8 +5,8 @@
 #include "ackermann_msgs/msg/ackermann_drive.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "phnx_control/speed_control.hpp"
-#include "phnx_io_ros/vendor/concurrentqueue.h"
 #include "phnx_io_ros/vendor/blockingconcurrentqueue.h"
+#include "phnx_io_ros/vendor/concurrentqueue.h"
 
 /// Threadsafe wrapper around PID
 class PidInterface {

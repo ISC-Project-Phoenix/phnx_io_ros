@@ -28,10 +28,10 @@ public:
                              bool antiwindup = true);
 
     /// Updates the controller, and creates a new command. The returned tuple contains a
-    /// 0.0-1.0 value for the actuator, as well as the enum initiating the actuator it applies to.
+    /// UNCAPPED value for the actuator (only igain is capped), as well as the enum initiating the actuator it applies to.
     std::tuple<double, Actuator> update(double speed, const rclcpp::Time& stamp);
 
-    /// Sets a new set speed. If negative, will be pinned to zero.
+    /// Sets a new set speed. If negative, will NOT be pinned to zero.
     void update_set_speed(double speed);
 
     /// Returns last (pe, ie, de, set speed, feedback)
