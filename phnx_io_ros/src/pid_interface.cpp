@@ -1,7 +1,12 @@
 #include "phnx_io_ros/pid_interface.hpp"
+#include <rclcpp/rclcpp.hpp>
 
-PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::SpeedController::Actuator>)> cb)
+PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::SpeedController::Actuator>)> cb, double kP, double kI, double kD)
     : cb(std::move(cb)) {
+    //PID Value params
+    
+    phnx_control::SpeedController pid{kP, kI, kD};
+        
     // Setup control thread
     this->thread = std::thread{[this]() {
         // This loop runs at the speed of odom

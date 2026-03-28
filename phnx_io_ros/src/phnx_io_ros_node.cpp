@@ -16,14 +16,34 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
         "/odom", 10, std::bind(&PhnxIoRos::filtered_odom_cb, this, std::placeholders::_1));
     _robot_state_client = this->create_client<robot_state_msgs::srv::SetState>("/robot/set_state");
 
+
+    /*  These parameters must be declared in this class for the configuration files to work
+        I don't really know why this is, but im a bit tired of digging through the repo and ros docs
+        This works, so I will not change.
+        TO CHANGE PID VALUES: please go to Phoenix/phoenix_robot/config/phnx_io_ros/phnx_io_ros.yaml
+        the values declared below will NOT be used by the program, it just keeps ros from bugging out
+        As of now, these changes still need a rebuild*/
+    this->declare_parameter("kP", 0.0);
+    this->declare_parameter("kI", 0.0);
+    this->declare_parameter("kD", 0.0);
+
+    double kP = this->get_parameter("kP").as_double();
+    double kI = this->get_parameter("kI").as_double();
+    double kD = this->get_parameter("kD").as_double();
+
+    // Print current PID Values
+    RCLCPP_INFO(this->get_logger(), "--- Speed Controller PID Settings ---");
+    RCLCPP_INFO(this->get_logger(), "kP: %.4f", kP);
+    RCLCPP_INFO(this->get_logger(), "kI: %.4f", kI);
+    RCLCPP_INFO(this->get_logger(), "kD: %.4f", kD);
+    RCLCPP_INFO(this->get_logger(), "------------------------------------");
+
     // Connect to roboteq over USB
     while (!this->roboteq.connect()) {
         // RCLCPP_INFO(this->get_logger(), "Could not connect to roboteq!");
         rclcpp::sleep_for(std::chrono::milliseconds(500));
     }
     RCLCPP_INFO(this->get_logger(), "Connected to Roboteq!");
-    
-
 
     // Check voltage on a timer
     // this->voltage_timer = this->create_wall_timer(std::chrono::seconds{1}, [this]() {
@@ -62,9 +82,10 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
     }
 
     RCLCPP_INFO(this->get_logger(), "Connected to device!");
+    
 
     // Start pid thread
-    this->pid = std::make_unique<PidInterface>(std::bind(&PhnxIoRos::handle_pid_update, this, std::placeholders::_1));
+    this->pid = std::make_unique<PidInterface>(std::bind(&PhnxIoRos::handle_pid_update, this, std::placeholders::_1), kP, kI, kD);
 
     /* Now we have three threads:
      * 1) Main node thread subs and pubs, as well as Roboteq voltage
@@ -101,7 +122,7 @@ float mapfloat(float x, float in_min, float in_max, float out_min, float out_max
 
 void pir::PhnxIoRos::send_can_cb(ackermann_msgs::msg::AckermannDrive::SharedPtr msg) {
     // If killed, make sure we avoid updating the pid, so it says at 0
-    
+
     // RCLCPP_INFO(this->get_logger(), "TEST TEST");
     if (this->killed) {
         return;
@@ -188,12 +209,12 @@ void pir::PhnxIoRos::read_data(serial::message m) {
                 std::unique_lock lk{this->last_steering_mtx};
 
                 odom.twist.twist.linear.x = msg->speed;
-//                odom.twist.twist.linear.y = 0;
+                //                odom.twist.twist.linear.y = 0;
                 odom.header.stamp = this->get_clock()->now();
 
-//                odom.twist.covariance.at(0) = TODO in theory these lines represent the encoder better, needs tuning
-//                    0.05 * std::abs(last_steering_angle) + 0.001;  // x has more error when turning
-//                odom.twist.covariance.at(7) = 0.001;               // y, we cannot move in y
+                //                odom.twist.covariance.at(0) = TODO in theory these lines represent the encoder better, needs tuning
+                //                    0.05 * std::abs(last_steering_angle) + 0.001;  // x has more error when turning
+                //                odom.twist.covariance.at(7) = 0.001;               // y, we cannot move in y
             }
 
             this->_odom_pub->publish(odom);
@@ -228,18 +249,19 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
     serial::drive_msg brake{};
 
     // Fit to limits
-    val = std::clamp(val, 0.0, 1.0);  
+    val = std::clamp(val, -1.0, 1.0);
 
     if (actuator == phnx_control::SpeedController::Actuator::Throttle) {
         // Set throttle to control, and zero brake
         throttle.type = CanMappings::SetThrottle;
-        throttle.speed = uint8_t(val * 100);
+        throttle.speed = uint8_t(val);
 
         brake.type = CanMappings::SetBrake;
         brake.speed = 0;
 
-        // Send commands to can
+        // Send commands to can, only the brakes use can *
         // RCLCPP_INFO(this->get_logger(), "Sending throttle command: %f", val);
+        // actual power demand no longer handled thru can, kept just in case.
         auto wrt_res = this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&throttle), sizeof(throttle));
         wrt_res += this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&brake), sizeof(brake));
 
@@ -263,11 +285,13 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
         throttle.speed = 0;
 
         brake.type = CanMappings::SetBrake;
-        brake.speed = uint8_t(val * 100);
+        brake.speed = uint8_t(std::abs(val) * 100);
 
         // Send commands to can
         RCLCPP_INFO(this->get_logger(), "Sending brake command: %f", val);
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&throttle), sizeof(throttle));
+        // previous line sends can message, but roboteq (and commanded speed) is not handled thru can
+        this->roboteq.set_power(0.0f);
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&brake), sizeof(brake));
     }
 }

@@ -66,13 +66,18 @@ public:
 
     /// Sets the motor to the percent power, governed by power scaling.
     bool set_power(float percent) {
+        // -1 <= percent <= 1
+
         std::unique_lock lk{mtx};
 
-        // Scale output 
+        // Scale output
         // Might need to lower this with the new ESC (maybe 250? -berto)
-        // int berto = 250;
-        // int not-berto= 1000;
-        uint16_t level = percent * 1000 * this->power_scale;
+
+        int16_t level = percent * 1000 * this->power_scale;  // power_scale currently 0.2
+        level = std::clamp(level, int16_t(-1000), int16_t(1000));
+        // via
+        // https://www.scribd.com/document/832439076/Roboteq-Controllers-User-Manual-v3-2-225-488
+        // "!G 1 'x' _", -1000 <= x <= 1000, we just never demanded 1000 so this was never an issue
 
         // Send go command to percent max power
         this->serial->Write(std::string{"!G 1 " + std::to_string(level) + " _"});

@@ -5,13 +5,13 @@
 #include "ackermann_msgs/msg/ackermann_drive.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "phnx_control/speed_control.hpp"
-#include "phnx_io_ros/vendor/concurrentqueue.h"
 #include "phnx_io_ros/vendor/blockingconcurrentqueue.h"
+#include "phnx_io_ros/vendor/concurrentqueue.h"
 
 /// Threadsafe wrapper around PID
 class PidInterface {
     /// Controller
-    phnx_control::SpeedController pid{0.8, 0.08, 0.008};
+    phnx_control::SpeedController pid;
     /// Control thread
     std::thread thread;
     /// Odom queue
@@ -27,7 +27,7 @@ class PidInterface {
     std::atomic<bool> stop_flag{false};
 
 public:
-    explicit PidInterface(std::function<void(std::tuple<double, phnx_control::SpeedController::Actuator>)> cb);
+    explicit PidInterface(std::function<void(std::tuple<double, phnx_control::SpeedController::Actuator>)> cb, double kP, double kI, double kD);
 
     /// Add speed of vehicle to feedback the PID. This runs the control loop, and ultimately calls the callback with
     /// the result.
