@@ -11,7 +11,7 @@
 /// Threadsafe wrapper around PID
 class PidInterface {
     /// Controller
-    phnx_control::SpeedController pid{0.09, 0.4, 0.2};
+    phnx_control::SpeedController pid;
     /// Control thread
     std::thread thread;
     /// Odom queue
@@ -27,7 +27,7 @@ class PidInterface {
     std::atomic<bool> stop_flag{false};
 
 public:
-    explicit PidInterface(std::function<void(std::tuple<double, phnx_control::SpeedController::Actuator>)> cb);
+    explicit PidInterface(std::function<void(std::tuple<double, phnx_control::SpeedController::Actuator>)> cb, double kP, double kI, double kD);
 
     /// Add speed of vehicle to feedback the PID. This runs the control loop, and ultimately calls the callback with
     /// the result.

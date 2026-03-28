@@ -4,7 +4,7 @@
 #include "phnx_io_ros/phnx_io_ros.hpp"
 
 pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
-    : Node("phnx_io_ros", options), roboteq(this->declare_parameter<float>("motor_scale", 0.2)) {
+    : Node("phnx_io_ros", options), roboteq(this->declare_parameter<float>("motor_scale", 0.35)) {
     this->_port_pattern =
         this->declare_parameter("port_search_pattern", "/dev/serial/by-id/usb-Teensyduino_USB_Serial*");
     this->_baud_rate = this->declare_parameter("baud_rate", 115200);
@@ -15,6 +15,28 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
     _filtered_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
         "/odom", 10, std::bind(&PhnxIoRos::filtered_odom_cb, this, std::placeholders::_1));
     _robot_state_client = this->create_client<robot_state_msgs::srv::SetState>("/robot/set_state");
+
+
+    /*  These parameters must be declared in this class for the configuration files to work
+        I don't really know why this is, but im a bit tired of digging through the repo and ros docs
+        This works, so I will not change.
+        TO CHANGE PID VALUES: please go to Phoenix/phoenix_robot/config/phnx_io_ros/phnx_io_ros.yaml
+        the values declared below will NOT be used by the program, it just keeps ros from bugging out
+        As of now, these changes still need a rebuild*/
+    this->declare_parameter("kP", 0.0);
+    this->declare_parameter("kI", 0.0);
+    this->declare_parameter("kD", 0.0);
+
+    double kP = this->get_parameter("kP").as_double();
+    double kI = this->get_parameter("kI").as_double();
+    double kD = this->get_parameter("kD").as_double();
+
+    // Print current PID Values
+    RCLCPP_INFO(this->get_logger(), "--- Speed Controller PID Settings ---");
+    RCLCPP_INFO(this->get_logger(), "kP: %.4f", kP);
+    RCLCPP_INFO(this->get_logger(), "kI: %.4f", kI);
+    RCLCPP_INFO(this->get_logger(), "kD: %.4f", kD);
+    RCLCPP_INFO(this->get_logger(), "------------------------------------");
 
     // Connect to roboteq over USB
     while (!this->roboteq.connect()) {
@@ -60,9 +82,10 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
     }
 
     RCLCPP_INFO(this->get_logger(), "Connected to device!");
+    
 
     // Start pid thread
-    this->pid = std::make_unique<PidInterface>(std::bind(&PhnxIoRos::handle_pid_update, this, std::placeholders::_1));
+    this->pid = std::make_unique<PidInterface>(std::bind(&PhnxIoRos::handle_pid_update, this, std::placeholders::_1), kP, kI, kD);
 
     /* Now we have three threads:
      * 1) Main node thread subs and pubs, as well as Roboteq voltage
@@ -231,7 +254,7 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
     if (actuator == phnx_control::SpeedController::Actuator::Throttle) {
         // Set throttle to control, and zero brake
         throttle.type = CanMappings::SetThrottle;
-        throttle.speed = uint8_t(std::abs(val) * 100);
+        throttle.speed = uint8_t(val);
 
         brake.type = CanMappings::SetBrake;
         brake.speed = 0;

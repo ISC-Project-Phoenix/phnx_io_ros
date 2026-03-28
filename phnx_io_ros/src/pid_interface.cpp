@@ -1,7 +1,12 @@
 #include "phnx_io_ros/pid_interface.hpp"
+#include <rclcpp/rclcpp.hpp>
 
-PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::SpeedController::Actuator>)> cb)
+PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::SpeedController::Actuator>)> cb, double kP, double kI, double kD)
     : cb(std::move(cb)) {
+    //PID Value params
+    
+    phnx_control::SpeedController pid{kP, kI, kD};
+        
     // Setup control thread
     this->thread = std::thread{[this]() {
         // This loop runs at the speed of odom
@@ -9,6 +14,14 @@ PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::S
             // Wait for feedback
             nav_msgs::msg::Odometry odom;
             this->odom_queue.wait_dequeue(odom);
+
+            // Ensure feedback is in valid range, since we want to zero out the encoder 
+            // when its below the values we care about. 
+            float zero_outter = 0.20;
+            if (odom.twist.twist.linear.x > -zero_outter && odom.twist.twist.linear.x < zero_outter) {
+                // zero this out please!
+                odom.twist.twist.linear.x = 0;
+            }
 
             // Always set speed, even if not updated, to avoid queuing latency on commands
             {
