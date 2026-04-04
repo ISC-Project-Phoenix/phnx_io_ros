@@ -4,6 +4,7 @@
 
 #include "ackermann_msgs/msg/ackermann_drive.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "phnx_msgs/msg/pid_val.hpp"
 #include "optional"
 #include "phnx_io_ros/pid_interface.hpp"
 #include "phnx_io_ros/roboteq.hpp"
@@ -57,6 +58,8 @@ private:
     rclcpp::Client<robot_state_msgs::srv::SetState>::SharedPtr _robot_state_client;
     /// Timer for checking voltage
     rclcpp::TimerBase::SharedPtr voltage_timer;
+    /// PID value publisher for debug and telemetry
+    rclcpp::Publisher<phnx_msgs::msg::PIDVal>::SharedPtr _pid_val;
 
     /// PID controller
     std::unique_ptr<PidInterface> pid;

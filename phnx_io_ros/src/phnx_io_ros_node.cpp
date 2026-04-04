@@ -15,6 +15,7 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
     _filtered_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
         "/odom", 10, std::bind(&PhnxIoRos::filtered_odom_cb, this, std::placeholders::_1));
     _robot_state_client = this->create_client<robot_state_msgs::srv::SetState>("/robot/set_state");
+    _pid_val = this->create_publisher<phnx_msgs::msg::PIDVal>("/pid_val",10);
 
 
     /*  These parameters must be declared in this class for the configuration files to work
@@ -252,6 +253,12 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
     val = std::clamp(val, -1.0, 1.0);
 
     if (actuator == phnx_control::SpeedController::Actuator::Throttle) {
+        //Publish PID values for monitoring and tuning, feel free to comment out if not nessecary
+        phnx_msgs::msg::PIDVal pidMessage{};
+        pidMessage.control = float(val);
+        this->_pid_val->publish(pidMessage);
+        // RCLCPP_INFO(this->get_logger(), (string)((double)val));
+
         // Set throttle to control, and zero brake
         throttle.type = CanMappings::SetThrottle;
         throttle.speed = uint8_t(val);
