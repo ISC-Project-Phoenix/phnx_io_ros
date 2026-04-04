@@ -249,15 +249,16 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
     serial::drive_msg throttle{};
     serial::drive_msg brake{};
 
-    // Fit to limits
-    val = std::clamp(val, -1.0, 1.0);
-
     auto pidMessage = phnx_msgs::msg::PIDVal();
     pidMessage.value_p = float(std::get<0>(this->pid->interface_get_components()));
+    pidMessage.value_i = float(std::get<1>(this->pid->interface_get_components()));
+    pidMessage.value_d = float(std::get<2>(this->pid->interface_get_components()));
     pidMessage.control = float(val);
     this->_pid_val->publish(pidMessage);
-    RCLCPP_INFO(this->get_logger(), "Control Val set to: ", float(val));
 
+
+    // Fit to limits
+    val = std::clamp(val, -1.0, 1.0);
 
     if (actuator == phnx_control::SpeedController::Actuator::Throttle) {
         //Publish PID values for monitoring and tuning, feel free to comment out if not nessecary
