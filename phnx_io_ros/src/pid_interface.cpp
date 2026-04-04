@@ -38,7 +38,10 @@ PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::S
     }};
 }
 
+
 void PidInterface::add_feedback(const nav_msgs::msg::Odometry& speed) { this->odom_queue.enqueue(speed); }
+
+std::tuple<double, double, double, double, double> PidInterface::interface_get_components() {return this->pid.get_components();}
 
 void PidInterface::set_command(const ackermann_msgs::msg::AckermannDrive& command) {
     std::unique_lock lk{this->command_mtx};

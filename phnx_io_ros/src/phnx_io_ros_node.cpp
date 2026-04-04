@@ -252,16 +252,20 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
     // Fit to limits
     val = std::clamp(val, -1.0, 1.0);
 
+    auto pidMessage = phnx_msgs::msg::PIDVal();
+    pidMessage.value_p = float(std::get<0>(this->pid->interface_get_components()));
+    pidMessage.control = float(val);
+    this->_pid_val->publish(pidMessage);
+    RCLCPP_INFO(this->get_logger(), "Control Val set to: ", float(val));
+
+
     if (actuator == phnx_control::SpeedController::Actuator::Throttle) {
         //Publish PID values for monitoring and tuning, feel free to comment out if not nessecary
-        phnx_msgs::msg::PIDVal pidMessage{};
-        pidMessage.control = float(val);
-        this->_pid_val->publish(pidMessage);
-        // RCLCPP_INFO(this->get_logger(), (string)((double)val));
-
+        
         // Set throttle to control, and zero brake
         throttle.type = CanMappings::SetThrottle;
-        throttle.speed = uint8_t(val);
+        // SHOULD BE DEPRECATED?
+        // throttle.speed = uint8_t(val); 
 
         brake.type = CanMappings::SetBrake;
         brake.speed = 0;
