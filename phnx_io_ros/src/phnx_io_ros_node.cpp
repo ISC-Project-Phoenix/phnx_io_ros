@@ -39,9 +39,10 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
     RCLCPP_INFO(this->get_logger(), "kD: %.4f", kD);
     RCLCPP_INFO(this->get_logger(), "------------------------------------");
 
+    
     // Connect to roboteq over USB
     while (!this->roboteq.connect()) {
-        // RCLCPP_INFO(this->get_logger(), "Could not connect to roboteq!");
+        RCLCPP_INFO(this->get_logger(), "Could not connect to roboteq!");
         rclcpp::sleep_for(std::chrono::milliseconds(500));
     }
     RCLCPP_INFO(this->get_logger(), "Connected to Roboteq!");

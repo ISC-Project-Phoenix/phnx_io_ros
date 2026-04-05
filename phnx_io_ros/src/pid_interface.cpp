@@ -5,7 +5,7 @@ PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::S
     : cb(std::move(cb)) {
     //PID Value params
     
-    phnx_control::SpeedController pid{kP, kI, kD};
+    phnx_control::SpeedController pid(kP, kI, kD);
         
     // Setup control thread
     this->thread = std::thread{[this]() {
