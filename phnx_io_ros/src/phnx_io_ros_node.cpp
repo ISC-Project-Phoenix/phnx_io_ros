@@ -1,6 +1,5 @@
 #include <cmath>
 #include <rclcpp/rclcpp.hpp>
-
 #include "phnx_io_ros/phnx_io_ros.hpp"
 
 pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
@@ -9,43 +8,41 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
         this->declare_parameter("port_search_pattern", "/dev/serial/by-id/usb-Teensyduino_USB_Serial*");
     this->_baud_rate = this->declare_parameter("baud_rate", 115200);
 
-    _odom_pub = this->create_publisher<nav_msgs::msg::Odometry>("/odom_can", 10);
-    _acks_sub = this->create_subscription<ackermann_msgs::msg::AckermannDrive>(
+    //Publishers
+    _odom_pub = this->create_publisher<nav_msgs::msg::Odometry>("/odom_can", 10); //in meter per sec
+    _pid_val = this->create_publisher<phnx_msgs::msg::PIDVal>("/pid_val",10);
+
+    //Subscribers
+    _acks_sub = this->create_subscription<ackermann_msgs::msg::AckermannDrive>( //Desired speed and steering
         "/robot/ack_vel", 10, std::bind(&PhnxIoRos::send_can_cb, this, std::placeholders::_1));
     _filtered_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
         "/odom", 10, std::bind(&PhnxIoRos::filtered_odom_cb, this, std::placeholders::_1));
     _robot_state_client = this->create_client<robot_state_msgs::srv::SetState>("/robot/set_state");
-    _pid_val = this->create_publisher<phnx_msgs::msg::PIDVal>("/pid_val",10);
+        
+    // DOESNT WORK AS OF NOW
+    // this->declare_parameter("kP", 0.0);
+    // this->declare_parameter("kI", 0.0);
+    // this->declare_parameter("kD", 0.0);
 
+    // double kP = this->get_parameter("kP").as_double();
+    // double kI = this->get_parameter("kI").as_double();
+    // double kD = this->get_parameter("kD").as_double();
 
-    /*  These parameters must be declared in this class for the configuration files to work
-        I don't really know why this is, but im a bit tired of digging through the repo and ros docs
-        This works, so I will not change.
-        TO CHANGE PID VALUES: please go to Phoenix/phoenix_robot/config/phnx_io_ros/phnx_io_ros.yaml
-        the values declared below will NOT be used by the program, it just keeps ros from bugging out
-        As of now, these changes still need a rebuild*/
-    this->declare_parameter("kP", 0.0);
-    this->declare_parameter("kI", 0.0);
-    this->declare_parameter("kD", 0.0);
+    // // Print current PID Values
+    // RCLCPP_INFO(this->get_logger(), "--- Speed Controller PID Settings ---");
+    // RCLCPP_INFO(this->get_logger(), "kP: %.4f", kP);
+    // RCLCPP_INFO(this->get_logger(), "kI: %.4f", kI);
+    // RCLCPP_INFO(this->get_logger(), "kD: %.4f", kD);
+    // RCLCPP_INFO(this->get_logger(), "------------------------------------");
 
-    double kP = this->get_parameter("kP").as_double();
-    double kI = this->get_parameter("kI").as_double();
-    double kD = this->get_parameter("kD").as_double();
-
-    // Print current PID Values
-    RCLCPP_INFO(this->get_logger(), "--- Speed Controller PID Settings ---");
-    RCLCPP_INFO(this->get_logger(), "kP: %.4f", kP);
-    RCLCPP_INFO(this->get_logger(), "kI: %.4f", kI);
-    RCLCPP_INFO(this->get_logger(), "kD: %.4f", kD);
-    RCLCPP_INFO(this->get_logger(), "------------------------------------");
 
     
-    // Connect to roboteq over USB
+    // Connect to roboteq over RS232/USB (speed controller)
     while (!this->roboteq.connect()) {
         RCLCPP_INFO(this->get_logger(), "Could not connect to roboteq!");
         rclcpp::sleep_for(std::chrono::milliseconds(500));
     }
-    RCLCPP_INFO(this->get_logger(), "Connected to Roboteq!");
+    RCLCPP_INFO(this->get_logger(), "Connected to Roboteq!"); 
 
     // Check voltage on a timer
     // this->voltage_timer = this->create_wall_timer(std::chrono::seconds{1}, [this]() {
@@ -89,6 +86,7 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
     // Start pid thread
     this->pid = std::make_unique<PidInterface>(std::bind(&PhnxIoRos::handle_pid_update, this, std::placeholders::_1), kP, kI, kD);
 
+    
     /* Now we have three threads:
      * 1) Main node thread subs and pubs, as well as Roboteq voltage
      * 2) CAN read thread
@@ -249,14 +247,13 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
 
     serial::drive_msg throttle{};
     serial::drive_msg brake{};
-
+     
     auto pidMessage = phnx_msgs::msg::PIDVal();
     pidMessage.value_p = float(std::get<0>(this->pid->interface_get_components()));
     pidMessage.value_i = float(std::get<1>(this->pid->interface_get_components()));
     pidMessage.value_d = float(std::get<2>(this->pid->interface_get_components()));
     pidMessage.control = float(val);
     this->_pid_val->publish(pidMessage);
-
 
     // Fit to limits
     val = std::clamp(val, -1.0, 1.0);

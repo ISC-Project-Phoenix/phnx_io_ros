@@ -26,6 +26,10 @@ class PidInterface {
 
     std::atomic<bool> stop_flag{false};
 
+    //Values to limit set speed increase
+    double limit = 0.04; //increase from previous set speed in m/s every 1/odom speed(30hz) of a second
+    double limSpeed = 0;
+
 public:
     explicit PidInterface(std::function<void(std::tuple<double, phnx_control::SpeedController::Actuator>)> cb, double kP, double kI, double kD); 
 

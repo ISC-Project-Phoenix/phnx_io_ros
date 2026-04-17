@@ -26,7 +26,15 @@ PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::S
             // Always set speed, even if not updated, to avoid queuing latency on commands
             {
                 std::unique_lock lk{this->command_mtx};
-                this->pid.update_set_speed(this->current_command.speed);
+                
+                //Limit increase in set speed to PID to prevent motor from shorting ):
+                if(current_command.speed > limSpeed + limit){
+                    limSpeed=limSpeed+limit;
+                }
+                else{
+                    limSpeed = current_command.speed;
+                }
+                this->pid.update_set_speed(this->limSpeed);
             }
 
             // Get control
