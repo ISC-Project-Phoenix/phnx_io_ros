@@ -20,13 +20,13 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
     _robot_state_client = this->create_client<robot_state_msgs::srv::SetState>("/robot/set_state");
         
     // DOESNT WORK AS OF NOW
-    // this->declare_parameter("kP", 0.0);
-    // this->declare_parameter("kI", 0.0);
-    // this->declare_parameter("kD", 0.0);
+    this->declare_parameter("kP", 0.0);
+    this->declare_parameter("kI", 0.0);
+    this->declare_parameter("kD", 0.0);
 
-    // double kP = this->get_parameter("kP").as_double();
-    // double kI = this->get_parameter("kI").as_double();
-    // double kD = this->get_parameter("kD").as_double();
+    double kP = this->get_parameter("kP").as_double();
+    double kI = this->get_parameter("kI").as_double();
+    double kD = this->get_parameter("kD").as_double();
 
     // // Print current PID Values
     // RCLCPP_INFO(this->get_logger(), "--- Speed Controller PID Settings ---");
