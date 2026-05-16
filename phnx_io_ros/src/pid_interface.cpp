@@ -51,6 +51,10 @@ void PidInterface::add_feedback(const nav_msgs::msg::Odometry& speed) { this->od
 
 std::tuple<double, double, double, double, double> PidInterface::interface_get_components() {return this->pid.get_components();}
 
+std::tuple<double, double, double> PidInterface::interface_get_coeffs() {return this->pid.get_coeffs();}
+
+void PidInterface::interface_set_coeffs(double kp, double ki, double kd){this->pid.set_coeffs(kp, ki, kd);}
+
 void PidInterface::set_command(const ackermann_msgs::msg::AckermannDrive& command) {
     std::unique_lock lk{this->command_mtx};
     this->current_command = command;

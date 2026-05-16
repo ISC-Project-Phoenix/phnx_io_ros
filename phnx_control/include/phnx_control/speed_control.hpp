@@ -36,6 +36,12 @@ public:
 
     /// Returns last (pe, ie, de, set speed, feedback)
     std::tuple<double, double, double, double, double> get_components();
+
+    //Returns current PID coefficients 
+    std::tuple<double, double, double> get_coeffs();
+
+    //sets PID coefficients 
+    void set_coeffs(double kp, double ki, double kd);
 };
 
 }  // namespace phnx_control

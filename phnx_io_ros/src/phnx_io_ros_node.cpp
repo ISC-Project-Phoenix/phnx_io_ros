@@ -19,7 +19,7 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
         "/odom", 10, std::bind(&PhnxIoRos::filtered_odom_cb, this, std::placeholders::_1));
     _robot_state_client = this->create_client<robot_state_msgs::srv::SetState>("/robot/set_state");
         
-    // DOESNT WORK AS OF NOW
+    // PARAMS DOESNT WORK AS OF NOW, BUT COMMENTING THIS STUFF OUT WILL BREAK EVERYTHING
     this->declare_parameter("kP", 0.0);
     this->declare_parameter("kI", 0.0);
     this->declare_parameter("kD", 0.0);
@@ -35,8 +35,6 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
     // RCLCPP_INFO(this->get_logger(), "kD: %.4f", kD);
     // RCLCPP_INFO(this->get_logger(), "------------------------------------");
 
-
-    
     // Connect to roboteq over RS232/USB (speed controller)
     while (!this->roboteq.connect()) {
         RCLCPP_INFO(this->get_logger(), "Could not connect to roboteq!");
@@ -44,7 +42,7 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
     }
     RCLCPP_INFO(this->get_logger(), "Connected to Roboteq!"); 
 
-    // Check voltage on a timer
+    // Check voltage on a timer 
     // this->voltage_timer = this->create_wall_timer(std::chrono::seconds{1}, [this]() {
     //     // Only measure voltage when not killed, as killing the bot will cause the voltage to drop
     //     if (!this->killed) {
@@ -76,17 +74,16 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
     cur_device.handler = new serial::serial(this->get_logger(), read_callback);
 
     while (cur_device.handler->open_connection(cur_device.port_name, this->_baud_rate) != 0) {
-        RCLCPP_ERROR(this->get_logger(), "Error opening device!");
+        RCLCPP_ERROR(this->get_logger(), "Error opening CAN device!");
         rclcpp::sleep_for(std::chrono::milliseconds(500));
     }
 
-    RCLCPP_INFO(this->get_logger(), "Connected to device!");
+    RCLCPP_INFO(this->get_logger(), "Connected to CAN device!");
     
 
     // Start pid thread
     this->pid = std::make_unique<PidInterface>(std::bind(&PhnxIoRos::handle_pid_update, this, std::placeholders::_1), kP, kI, kD);
 
-    
     /* Now we have three threads:
      * 1) Main node thread subs and pubs, as well as Roboteq voltage
      * 2) CAN read thread
@@ -241,6 +238,12 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
         return;
     }
 
+    //update PID values live
+    double kP = this->get_parameter("kP").as_double();
+    double kI = this->get_parameter("kI").as_double();
+    double kD = this->get_parameter("kD").as_double();
+    this->pid->interface_set_coeffs(kP, kI, kD);
+
     auto [val, actuator] = control;
 
     // RCLCPP_INFO(this->get_logger(), "Sending drive msg with level: %f and actuator: %u", val, uint32_t(actuator));
@@ -252,6 +255,9 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
     pidMessage.value_p = float(std::get<0>(this->pid->interface_get_components()));
     pidMessage.value_i = float(std::get<1>(this->pid->interface_get_components()));
     pidMessage.value_d = float(std::get<2>(this->pid->interface_get_components()));
+    pidMessage.coeff_p = float(std::get<0>(this->pid->interface_get_coeffs()));
+    pidMessage.coeff_i = float(std::get<1>(this->pid->interface_get_coeffs()));
+    pidMessage.coeff_d = float(std::get<2>(this->pid->interface_get_coeffs()));
     pidMessage.control = float(val);
     this->_pid_val->publish(pidMessage);
 
