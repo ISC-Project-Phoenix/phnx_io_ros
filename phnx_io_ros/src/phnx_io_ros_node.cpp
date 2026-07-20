@@ -175,10 +175,10 @@ void pir::PhnxIoRos::read_data(serial::message m) {
             try {
                 bool res = this->roboteq.set_power(0);
 
-                if (res) {
+                if (!res) {
                     RCLCPP_ERROR(this->get_logger(), "Roboteq responded with non + !");
                 }
-            } catch (std::system_error& error) {
+            } catch (const std::exception& error) {
                 RCLCPP_ERROR(this->get_logger(), "Writing to Roboteq failed with: %s", error.what());
             }
 
@@ -289,10 +289,10 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
         try {
             bool res = this->roboteq.set_power(float(val));
 
-            if (res) {
+            if (!res) {
                 // RCLCPP_ERROR(this->get_logger(), "Roboteq responded with non + !");
             }
-        } catch (std::system_error& error) {
+        } catch (const std::exception& error) {
             RCLCPP_ERROR(this->get_logger(), "Writing to Roboteq failed with: %s", error.what());
         }
     } else {
@@ -307,7 +307,11 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
         RCLCPP_INFO(this->get_logger(), "Sending brake command: %f", val);
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&throttle), sizeof(throttle));
         // previous line sends can message, but roboteq (and commanded speed) is not handled thru can
-        this->roboteq.set_power(0.0f);
+        try {
+            this->roboteq.set_power(0.0f);
+        } catch (const std::exception& error) {
+            RCLCPP_ERROR(this->get_logger(), "Writing to Roboteq failed with: %s", error.what());
+        }
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&brake), sizeof(brake));
     }
 }

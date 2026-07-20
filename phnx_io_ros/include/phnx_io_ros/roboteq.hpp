@@ -13,6 +13,8 @@
 #include "optional"
 
 /// Interface to a Roboteq motor controller connected over USB. Threadsafe through internal locking.
+/// If the device disconnects mid-command, set_power throws so the caller can log it, and
+/// reconnection is attempted on the next command.
 class Roboteq {
     std::unique_ptr<mn::CppLinuxSerial::SerialPort> serial;
     /// 0-1 float to scale all commands by. Caps the speed.
@@ -43,6 +45,9 @@ class Roboteq {
     /// Checks if the roboteq response indicates ok.
     bool check_msg_ok(const std::string& s) { return s.find('+') != std::string::npos; }
 
+    /// True if the serial port is currently open. Reconnect if this is false.
+    bool port_open() { return this->serial && this->serial->GetState() == mn::CppLinuxSerial::State::OPEN; }
+
 public:
     explicit Roboteq(float power_scale) { this->power_scale = power_scale; }
 
@@ -54,21 +59,34 @@ public:
             return false;
         }
 
-        this->serial = std::make_unique<mn::CppLinuxSerial::SerialPort>(
-            *maybe_port, mn::CppLinuxSerial::BaudRate::B_115200, mn::CppLinuxSerial::NumDataBits::EIGHT,
-            mn::CppLinuxSerial::Parity::NONE, mn::CppLinuxSerial::NumStopBits::ONE);
+        try {
+            this->serial = std::make_unique<mn::CppLinuxSerial::SerialPort>(
+                *maybe_port, mn::CppLinuxSerial::BaudRate::B_115200, mn::CppLinuxSerial::NumDataBits::EIGHT,
+                mn::CppLinuxSerial::Parity::NONE, mn::CppLinuxSerial::NumStopBits::ONE);
 
-        this->serial->SetTimeout(50);
-        this->serial->Open();
+            this->serial->SetTimeout(50);
+            this->serial->Open();
+        } catch (const std::exception& e) {
+            // Open throws if the port exists but can't be used yet (permissions, still enumerating)
+            this->serial.reset();
+            return false;
+        }
 
         return this->serial->GetState() == mn::CppLinuxSerial::State::OPEN;
     }
 
     /// Sets the motor to the percent power, governed by power scaling.
+    /// Returns false if the roboteq NAKs or cannot be found. Throws if the device
+    /// disconnects mid-command; the next call will reconnect.
     bool set_power(float percent) {
         // -1 <= percent <= 1
 
         std::unique_lock lk{mtx};
+
+        // Reestablish the connection if the device dropped
+        if (!this->port_open() && !this->connect()) {
+            return false;
+        }
 
         // Scale output
         // Might need to lower this with the new ESC (maybe 250? -berto)
@@ -79,39 +97,65 @@ public:
         // https://www.scribd.com/document/832439076/Roboteq-Controllers-User-Manual-v3-2-225-488
         // "!G 1 'x' _", -1000 <= x <= 1000, we just never demanded 1000 so this was never an issue
 
-        // Send go command to percent max power
-        this->serial->Write(std::string{"!G 1 " + std::to_string(level) + " _"});
+        try {
+            // Send go command to percent max power
+            this->serial->Write(std::string{"!G 1 " + std::to_string(level) + " _"});
 
-        std::string res{};
-        this->serial->Read(res);
+            std::string res{};
+            this->serial->Read(res);
 
-        return this->check_msg_ok(res);
+            return this->check_msg_ok(res);
+        } catch (const std::exception& e) {
+            // Write/Read throw if the device disconnected. Drop the port so the next call
+            // reconnects, then rethrow so the caller can log what happened
+            this->serial.reset();
+            throw;
+        }
     }
 
     /// Send a ping to the Roboteq, and check for its response.
     bool check_alive() {
         std::unique_lock lk{mtx};
 
-        // Send ENQ
-        std::vector<uint8_t> vec{0x5};
-        this->serial->WriteBinary(vec);
+        // Reestablish the connection if the device dropped
+        if (!this->port_open() && !this->connect()) {
+            return false;
+        }
 
-        vec.clear();
-        this->serial->ReadBinary(vec);
+        try {
+            // Send ENQ
+            std::vector<uint8_t> vec{0x5};
+            this->serial->WriteBinary(vec);
 
-        // ACK
-        return vec[0] == 0x6;
+            vec.clear();
+            this->serial->ReadBinary(vec);
+
+            // ACK
+            return !vec.empty() && vec[0] == 0x6;
+        } catch (const std::exception& e) {
+            this->serial.reset();
+            return false;
+        }
     }
 
     /// Get battery voltage, if possible.
     std::optional<float> get_batt_voltage() {
         std::unique_lock lk{mtx};
 
-        // Ask for battery voltage
-        this->serial->Write(std::string{"?V 2 _"});
+        // Reestablish the connection if the device dropped
+        if (!this->port_open() && !this->connect()) {
+            return std::nullopt;
+        }
 
         std::string res{};
-        this->serial->Read(res);
+        try {
+            // Ask for battery voltage
+            this->serial->Write(std::string{"?V 2 _"});
+            this->serial->Read(res);
+        } catch (const std::exception& e) {
+            this->serial.reset();
+            return std::nullopt;
+        }
 
         // Should be V=XXX, where XXX is voltage*10
         if (res.size() > 3) {
