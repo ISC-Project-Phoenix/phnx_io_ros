@@ -12,6 +12,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(ackermann_msgs REQUIRED)
 find_package(control_toolbox REQUIRED)
+find_package(phnx_msgs REQUIRED)
 
 add_library(phnx_control SHARED src/speed_control.cpp)
 target_include_directories(phnx_control PUBLIC
@@ -25,6 +26,7 @@ set(deps
         ackermann_msgs
         nav_msgs
         control_toolbox
+        phnx_msgs
 )
 
 ament_target_dependencies(

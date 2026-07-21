@@ -28,6 +28,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(ackermann_msgs REQUIRED)
 find_package(robot_state_msgs REQUIRED)
+find_package(phnx_msgs REQUIRED)
 find_package(phnx_control REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
@@ -42,6 +43,7 @@ set(dependencies
         ackermann_msgs
         robot_state_msgs
         nav_msgs
+        phnx_msgs
         phnx_control
 )
 ament_target_dependencies(

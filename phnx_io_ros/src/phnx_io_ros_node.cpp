@@ -1,6 +1,5 @@
 #include <cmath>
 #include <rclcpp/rclcpp.hpp>
-
 #include "phnx_io_ros/phnx_io_ros.hpp"
 
 pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
@@ -9,20 +8,18 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
         this->declare_parameter("port_search_pattern", "/dev/serial/by-id/usb-Teensyduino_USB_Serial*");
     this->_baud_rate = this->declare_parameter("baud_rate", 115200);
 
-    _odom_pub = this->create_publisher<nav_msgs::msg::Odometry>("/odom_can", 10);
-    _acks_sub = this->create_subscription<ackermann_msgs::msg::AckermannDrive>(
+    //Publishers
+    _odom_pub = this->create_publisher<nav_msgs::msg::Odometry>("/odom_can", 10); //in meter per sec
+    _pid_val = this->create_publisher<phnx_msgs::msg::PIDVal>("/pid_val",10);
+
+    //Subscribers
+    _acks_sub = this->create_subscription<ackermann_msgs::msg::AckermannDrive>( //Desired speed and steering
         "/robot/ack_vel", 10, std::bind(&PhnxIoRos::send_can_cb, this, std::placeholders::_1));
     _filtered_odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
         "/odom", 10, std::bind(&PhnxIoRos::filtered_odom_cb, this, std::placeholders::_1));
     _robot_state_client = this->create_client<robot_state_msgs::srv::SetState>("/robot/set_state");
-
-
-    /*  These parameters must be declared in this class for the configuration files to work
-        I don't really know why this is, but im a bit tired of digging through the repo and ros docs
-        This works, so I will not change.
-        TO CHANGE PID VALUES: please go to Phoenix/phoenix_robot/config/phnx_io_ros/phnx_io_ros.yaml
-        the values declared below will NOT be used by the program, it just keeps ros from bugging out
-        As of now, these changes still need a rebuild*/
+        
+    // PARAMS DOESNT WORK AS OF NOW, BUT COMMENTING THIS STUFF OUT WILL BREAK EVERYTHING
     this->declare_parameter("kP", 0.0);
     this->declare_parameter("kI", 0.0);
     this->declare_parameter("kD", 0.0);
@@ -31,21 +28,21 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
     double kI = this->get_parameter("kI").as_double();
     double kD = this->get_parameter("kD").as_double();
 
-    // Print current PID Values
-    RCLCPP_INFO(this->get_logger(), "--- Speed Controller PID Settings ---");
-    RCLCPP_INFO(this->get_logger(), "kP: %.4f", kP);
-    RCLCPP_INFO(this->get_logger(), "kI: %.4f", kI);
-    RCLCPP_INFO(this->get_logger(), "kD: %.4f", kD);
-    RCLCPP_INFO(this->get_logger(), "------------------------------------");
+    // // Print current PID Values
+    // RCLCPP_INFO(this->get_logger(), "--- Speed Controller PID Settings ---");
+    // RCLCPP_INFO(this->get_logger(), "kP: %.4f", kP);
+    // RCLCPP_INFO(this->get_logger(), "kI: %.4f", kI);
+    // RCLCPP_INFO(this->get_logger(), "kD: %.4f", kD);
+    // RCLCPP_INFO(this->get_logger(), "------------------------------------");
 
-    // Connect to roboteq over USB
+    // Connect to roboteq over RS232/USB (speed controller)
     while (!this->roboteq.connect()) {
-        // RCLCPP_INFO(this->get_logger(), "Could not connect to roboteq!");
+        RCLCPP_INFO(this->get_logger(), "Could not connect to roboteq!");
         rclcpp::sleep_for(std::chrono::milliseconds(500));
     }
-    RCLCPP_INFO(this->get_logger(), "Connected to Roboteq!");
+    RCLCPP_INFO(this->get_logger(), "Connected to Roboteq!"); 
 
-    // Check voltage on a timer
+    // Check voltage on a timer 
     // this->voltage_timer = this->create_wall_timer(std::chrono::seconds{1}, [this]() {
     //     // Only measure voltage when not killed, as killing the bot will cause the voltage to drop
     //     if (!this->killed) {
@@ -77,11 +74,11 @@ pir::PhnxIoRos::PhnxIoRos(rclcpp::NodeOptions options)
     cur_device.handler = new serial::serial(this->get_logger(), read_callback);
 
     while (cur_device.handler->open_connection(cur_device.port_name, this->_baud_rate) != 0) {
-        RCLCPP_ERROR(this->get_logger(), "Error opening device!");
+        RCLCPP_ERROR(this->get_logger(), "Error opening CAN device!");
         rclcpp::sleep_for(std::chrono::milliseconds(500));
     }
 
-    RCLCPP_INFO(this->get_logger(), "Connected to device!");
+    RCLCPP_INFO(this->get_logger(), "Connected to CAN device!");
     
 
     // Start pid thread
@@ -178,10 +175,10 @@ void pir::PhnxIoRos::read_data(serial::message m) {
             try {
                 bool res = this->roboteq.set_power(0);
 
-                if (res) {
+                if (!res) {
                     RCLCPP_ERROR(this->get_logger(), "Roboteq responded with non + !");
                 }
-            } catch (std::system_error& error) {
+            } catch (const std::exception& error) {
                 RCLCPP_ERROR(this->get_logger(), "Writing to Roboteq failed with: %s", error.what());
             }
 
@@ -241,20 +238,39 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
         return;
     }
 
+    //update PID values live
+    double kP = this->get_parameter("kP").as_double();
+    double kI = this->get_parameter("kI").as_double();
+    double kD = this->get_parameter("kD").as_double();
+    this->pid->interface_set_coeffs(kP, kI, kD);
+
     auto [val, actuator] = control;
 
     // RCLCPP_INFO(this->get_logger(), "Sending drive msg with level: %f and actuator: %u", val, uint32_t(actuator));
 
     serial::drive_msg throttle{};
     serial::drive_msg brake{};
+     
+    auto pidMessage = phnx_msgs::msg::PIDVal();
+    pidMessage.value_p = float(std::get<0>(this->pid->interface_get_components()));
+    pidMessage.value_i = float(std::get<1>(this->pid->interface_get_components()));
+    pidMessage.value_d = float(std::get<2>(this->pid->interface_get_components()));
+    pidMessage.coeff_p = float(std::get<0>(this->pid->interface_get_coeffs()));
+    pidMessage.coeff_i = float(std::get<1>(this->pid->interface_get_coeffs()));
+    pidMessage.coeff_d = float(std::get<2>(this->pid->interface_get_coeffs()));
+    pidMessage.control = float(val);
+    this->_pid_val->publish(pidMessage);
 
     // Fit to limits
     val = std::clamp(val, -1.0, 1.0);
 
     if (actuator == phnx_control::SpeedController::Actuator::Throttle) {
+        //Publish PID values for monitoring and tuning, feel free to comment out if not nessecary
+        
         // Set throttle to control, and zero brake
         throttle.type = CanMappings::SetThrottle;
-        throttle.speed = uint8_t(val);
+        // SHOULD BE DEPRECATED?
+        // throttle.speed = uint8_t(val); 
 
         brake.type = CanMappings::SetBrake;
         brake.speed = 0;
@@ -273,10 +289,10 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
         try {
             bool res = this->roboteq.set_power(float(val));
 
-            if (res) {
+            if (!res) {
                 // RCLCPP_ERROR(this->get_logger(), "Roboteq responded with non + !");
             }
-        } catch (std::system_error& error) {
+        } catch (const std::exception& error) {
             RCLCPP_ERROR(this->get_logger(), "Writing to Roboteq failed with: %s", error.what());
         }
     } else {
@@ -291,7 +307,11 @@ void pir::PhnxIoRos::handle_pid_update(std::tuple<double, phnx_control::SpeedCon
         RCLCPP_INFO(this->get_logger(), "Sending brake command: %f", val);
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&throttle), sizeof(throttle));
         // previous line sends can message, but roboteq (and commanded speed) is not handled thru can
-        this->roboteq.set_power(0.0f);
+        try {
+            this->roboteq.set_power(0.0f);
+        } catch (const std::exception& error) {
+            RCLCPP_ERROR(this->get_logger(), "Writing to Roboteq failed with: %s", error.what());
+        }
         this->cur_device.handler->write_packet(reinterpret_cast<uint8_t*>(&brake), sizeof(brake));
     }
 }

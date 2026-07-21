@@ -5,7 +5,7 @@ PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::S
     : cb(std::move(cb)) {
     //PID Value params
     
-    phnx_control::SpeedController pid{kP, kI, kD};
+    phnx_control::SpeedController pid(kP, kI, kD);
         
     // Setup control thread
     this->thread = std::thread{[this]() {
@@ -26,7 +26,15 @@ PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::S
             // Always set speed, even if not updated, to avoid queuing latency on commands
             {
                 std::unique_lock lk{this->command_mtx};
-                this->pid.update_set_speed(this->current_command.speed);
+                
+                //Limit increase in set speed to PID to prevent motor from shorting ):
+                if(current_command.speed > limSpeed + limit){
+                    limSpeed=limSpeed+limit;
+                }
+                else{
+                    limSpeed = current_command.speed;
+                }
+                this->pid.update_set_speed(this->limSpeed);
             }
 
             // Get control
@@ -38,7 +46,14 @@ PidInterface::PidInterface(std::function<void(std::tuple<double, phnx_control::S
     }};
 }
 
+
 void PidInterface::add_feedback(const nav_msgs::msg::Odometry& speed) { this->odom_queue.enqueue(speed); }
+
+std::tuple<double, double, double, double, double> PidInterface::interface_get_components() {return this->pid.get_components();}
+
+std::tuple<double, double, double> PidInterface::interface_get_coeffs() {return this->pid.get_coeffs();}
+
+void PidInterface::interface_set_coeffs(double kp, double ki, double kd){this->pid.set_coeffs(kp, ki, kd);}
 
 void PidInterface::set_command(const ackermann_msgs::msg::AckermannDrive& command) {
     std::unique_lock lk{this->command_mtx};
